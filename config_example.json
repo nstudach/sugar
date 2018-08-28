@@ -1,0 +1,32 @@
+{
+    "slack":{
+        "token": "Slack Chatroom Token",
+        "channel": "#<<Slack Channel name>>"
+    },
+    "droplet":{
+        "name": "Will automatically generate",
+        "region": "Filled by entries in regions",
+        "size": "s-2vcpu-2gb",
+        "image": "debian-8-x64",
+        "_ssh_keys_comment":"SSH KEY ID on DigitalOcean as int",
+        "ssh_keys": [1234],
+        "backups": false,
+        "ipv6": true,
+        "user_data": null,
+        "private_networking": null,
+        "volumes": null
+    },
+    "provider":{
+        "headers":{
+            "Content-Type": "application/json",
+            "Authorization": "Bearer <<DO API Token>>"
+        },
+        "regions": ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", "sfo2", "sgp1", "tor1"]
+    },
+    "measurement":{
+        "inputfile": ["https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1"],
+        "campaign": "<<PTO Campaign name>>",
+        "token": "<<PTO Token>>",
+        "workers": "20"
+    }
+}
