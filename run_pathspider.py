@@ -61,7 +61,7 @@ if __name__ == "__main__":
     option = config['measurement']
     err1 = open('stderr1.txt','w')
     i = 0
-    debug = True
+    debug = option['debug']
 
     # start measurement for each file in config
     for file in option['inputfile']:
