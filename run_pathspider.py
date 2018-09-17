@@ -78,7 +78,7 @@ if __name__ == "__main__":
         # start measurement
         if call(['pspdr', 'measure', '-i', 'eth0', '--input', file, '--output', output, '-w', option['workers'], plugin], stderr=open(stderr, 'w')) != 0:
             # Failed measurement
-            msg = 'Failed measurement:\n'
+            msg += 'Failed measurement:\n'
             if debug:
                 msg += process_stderr(stderr)
             # Send progress to slack
@@ -98,10 +98,11 @@ if __name__ == "__main__":
 
 
             # Set variables
-            metadata = 'plugin:' + plugin + ' location:' + location
+            metadata1 = 'plugin:' + plugin
+            metadata2 = 'location:' + location
 
             # Upload data
-            if call(['pspdr', 'upload', '--metadata', metadata, '--token', option['token'], '--campaign', option['campaign'], output], stderr=open(stderr, 'w')) != 0:
+            if call(['pspdr', 'upload', '--metadata', metadata1, metadata2, '--token', option['token'], '--campaign', option['campaign'], output], stderr=open(stderr, 'w')) != 0:
                 # Upload failed
                 msg += 'Upload failed:\n'
                 if debug:
