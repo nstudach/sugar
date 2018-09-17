@@ -90,9 +90,9 @@ with open('config.json', 'w') as outfile:
     json.dump(config, outfile)
 
 if failed_pkg == '':
-    msg = 'Installation succesfull'
+    msg += 'Installation succesfull'
 else:
-    msg = 'Installation failed with: ' + failed_pkg
+    msg += 'Installation failed with: ' + failed_pkg
 
 # send msg
 slackClient.chat.post_message(config['slack']['channel'], msg)
