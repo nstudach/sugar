@@ -118,8 +118,6 @@ if __name__ == "__main__":
     headers = config['provider']['headers']
     inputfile = config['measurement']['inputfile']
     
-    regions = ['fra1']
-    
     hosts = []
     jobs = []
     jobs_setup = []
@@ -137,10 +135,9 @@ if __name__ == "__main__":
         
     # for testing purpouse
     with open('delete_commands_'+plugin, 'a') as fuckup:
+        fuckup.write(str(hosts) + '\n')
         for id in ids:
             fuckup.write('curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" "https://api.digitalocean.com/v2/droplets/'+str(id)+'"\n')
-    print(hosts)
-    print(jobs)
 
     #may want to wait a bit for host to start
     sleep(50)

@@ -101,8 +101,7 @@ if __name__ == "__main__":
             metadata = 'plugin:' + plugin + ' location:' + location
 
             # Upload data
-            # if call(['pspdr', 'upload', '--metadata', metadata, '--token', option['token'], '--campaign', option['campaign'], output], stderr=open(stderr, 'w')) != 0:
-            if False:
+            if call(['pspdr', 'upload', '--metadata', metadata, '--token', option['token'], '--campaign', option['campaign'], output], stderr=open(stderr, 'w')) != 0:
                 # Upload failed
                 msg += 'Upload failed:\n'
                 if debug:
