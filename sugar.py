@@ -38,7 +38,7 @@ def ssh_stuff(hosts, jobs, inputfiles):
 
     #remote execute run_pathspider
     print('Run deployment script')
-    output = client.run_command('%s', host_args = jobs, use_pty = False)
+    client.run_command('%s', host_args = jobs, use_pty = False)
     
     sleep(20)
     
