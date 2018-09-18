@@ -18,10 +18,6 @@ def process_stderr(filename):
 def destroy_VM(headers,id):
     url = "https://api.digitalocean.com/v2/droplets/" + str(id)
     # delete droplet
-<<<<<<< HEAD
-    r = requests.delete(url, headers=headers)
-
-=======
     requests.delete(url, headers=headers)
 
 def analyze_output(filename, plugin):
@@ -50,7 +46,6 @@ def search(filename, keywords):
                     counter[keyword] += 1
                     break
     return json.dumps(counter)
->>>>>>> debian
 
 if __name__ == "__main__":
     # setup Slack
@@ -62,33 +57,6 @@ if __name__ == "__main__":
     name = str(sys.argv[1])
     location = name.split('-')[1]
     plugin = str(sys.argv[2])
-<<<<<<< HEAD
-    err1 = open('stderr1.txt','w')
-    err2 = open('stderr2.txt','w')
-    output = ''.join(random.choices(letters, k=5)) +'-' + location + '-' + plugin
-    
-    option = config['measurement']
-    msg = name + ': Started measurment:'+' '.join(['pspdr', 'measure', '-i', 'eth0', '--input', option['inputfile'], '--output', output, '-w', option['workers'], str(sys.argv[2])])
-    slackClient.chat.post_message(channel, msg)
-    
-    if call(['pspdr', 'measure', '-i', 'eth0', '--input', option['inputfile'], '--output', output, '-w', option['workers'], plugin], stderr=err1) != 0:
-        msg = name + ': Failed measurement'
-        slackClient.chat.post_message(channel, msg+process_stderr('stderr1.txt'))
-    else:
-        msg = str(sys.argv[1]) + ': Completed measurement'
-        slackClient.chat.post_message(channel, msg)
-        # Upload data
-        plugin = 'plugin:'+plugin
-        location = 'location:'+location
-        if call(['pspdr', 'upload', '--metadata', location, plugin, '--token', option['token'], '--campaign', option['campaign'], output], stderr=err2) != 0:
-            msg = str(sys.argv[1]) + ': Upload failed'
-            slackClient.chat.post_message(channel, msg+process_stderr('stderr2.txt'))
-        else:
-            msg = str(sys.argv[1]) + ': Upload succesfull: ' + output
-            slackClient.chat.post_message(channel, msg)
-    msg = str(sys.argv[1]) + ': Destroying Droplet'
-    slackClient.chat.post_message(channel, msg)
-=======
     pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
     option = config['measurement']
     err1 = open('stderr1.txt','w')
@@ -148,6 +116,5 @@ if __name__ == "__main__":
                 slackClient.chat.post_message(channel, msg)
     
     slackClient.chat.post_message(channel, name + ': Destroying Droplet')
->>>>>>> debian
     #destroy the droplet
     destroy_VM(config['provider']['headers'], id = str(sys.argv[3]))
