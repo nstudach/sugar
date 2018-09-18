@@ -8,7 +8,7 @@ from gevent import joinall
 
 def destroy_VM(headers,id):
     #REMOVE destroy part
-    smthg = input("Enter anything to destroy VM: " + str(id))
+    input("Enter anything to destroy VM: " + str(id))
     
     url = "https://api.digitalocean.com/v2/droplets/" + str(id)
     
@@ -16,12 +16,12 @@ def destroy_VM(headers,id):
     r = requests.delete(url, headers=headers)
     print(r)
 
-def ssh_stuff(hosts, jobs, jobs_setup, inputfile):
+def ssh_stuff(hosts, jobs, jobs_setup, inputfiles):
     '''
     Copys local files to remote hosts
     Installs packages and libraries
     Executes pathspider in servers background
-    Disconnects ssh_stuff
+    Disconnects ssh_connection
     
     :param hosts: Contains IP adresses of VM machines
     :type hosts: list(str)
@@ -41,32 +41,26 @@ def ssh_stuff(hosts, jobs, jobs_setup, inputfile):
     joinall(cmds, raise_error=True)
     cmds = client.copy_file('config.json', 'config.json')
     joinall(cmds, raise_error=True)
-    if not inputfile.startswith('http'):
-        cmds = client.copy_file(inputfile, inputfile)
-        joinall(cmds, raise_error=True)
+    for inputfile in inputfiles:
+        if not inputfile.startswith('http'):
+            cmds = client.copy_file(inputfile, inputfile)
+            joinall(cmds, raise_error=True)
     
     sleep(10)
     
     #remote execute install_script
-    print('installing stuff')
+    print('Setting up VMs')
     output = client.run_command('%s', host_args = jobs_setup)
     #wait until finished
     client.join(output, consume_output=False, timeout=None)
     
     #remote execute run_pathspider
-    print('running psdpr')
+    print('Initiate measurement scripts')
     output = client.run_command('%s', host_args = jobs, use_pty = False)
     
     sleep(20)
     
-    print('closing connection')
-    # for host, host_out in output.items():
-        # client.host_clients[host].close_channel(host_out.channel)
-    # print('connection closed')
-    #might save output as filee
-    # print(type(output))
-    # print_output(hosts, output)
-    # print_output(hosts, output2)
+    print('closing connections')
 
 def print_output(hosts, output):
     for host in hosts:
@@ -114,22 +108,7 @@ def sleep(seconds):
     print('Sleeping for %d sec' % seconds)
     time.sleep(seconds)
 
-def help():
-    print('usage:')
-    print('python3 create_droplet.py plugin')
-    print()
-    print('Information:')
-    print('Creates Servers to remotly run pathspider')
-    print('Progress can be viewed via slack channel defined unde slack.json')
-    quit()
-
 if __name__ == "__main__":
-
-    # #fake -h options
-    # if len(sys.argv) != 2:
-        # help()
-    # elif str(sys.argv[1]) is '-h' or '--help' or 'h':
-        # help()
         
     plugin = str(sys.argv[1])
     #read_conf
@@ -138,8 +117,6 @@ if __name__ == "__main__":
     regions = config['provider']['regions']
     headers = config['provider']['headers']
     inputfile = config['measurement']['inputfile']
-    
-    # regions = ['ams3']
     
     hosts = []
     jobs = []
@@ -158,15 +135,14 @@ if __name__ == "__main__":
         
     # for testing purpouse
     with open('delete_commands_'+plugin, 'a') as fuckup:
+        fuckup.write(str(hosts) + '\n')
         for id in ids:
             fuckup.write('curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" "https://api.digitalocean.com/v2/droplets/'+str(id)+'"\n')
-    print(hosts)
-    print(jobs)
 
     #may want to wait a bit for host to start
     sleep(50)
 
     ssh_stuff(hosts, jobs, jobs_setup, inputfile)
-    print('Disconnected! Done')
+    print('Disconnected from hosts! Progress will be displayed on the slack channel.')
     # for id in ids:
         # destroy_VM(headers, id)

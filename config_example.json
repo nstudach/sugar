@@ -7,8 +7,13 @@
         "name": "Will automatically generate",
         "region": "Filled by entries in regions",
         "size": "s-2vcpu-2gb",
+<<<<<<< HEAD
         "image": "debian-8-x64",
         "_ssh_keys_comment":"SSH KEY ID on DigitalOcean as int"
+=======
+        "image": "debian-9-x64",
+        "_ssh_keys_comment":"SSH KEY ID on DigitalOcean as int",
+>>>>>>> debian
         "ssh_keys": [1234],
         "backups": false,
         "ipv6": true,
@@ -24,9 +29,17 @@
         "regions": ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", "sfo2", "sgp1", "tor1"]
     },
     "measurement":{
+<<<<<<< HEAD
         "inputfile": "https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1",
         "campaign": "<<PTO Campaign name>>",
         "token": "<<PTO Token>>",
         "workers": "20"
+=======
+        "inputfile": ["https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1", "other input files"],
+        "campaign": "<<PTO Campaign name>>",
+        "token": "<<PTO Token>>",
+        "workers": "20",
+        "debug": false
+>>>>>>> debian
     }
 }
