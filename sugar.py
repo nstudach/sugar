@@ -23,9 +23,9 @@ def ssh_stuff(hosts, jobs, inputfiles):
     
     client = ParallelSSHClient(hosts, user = 'root', pkey = 'keys/id_rsa')
 
-    # copy install_script, run_pathspider, input file
+    # copy remote_script, input file, config file
     print('start copying files')
-    cmds = client.copy_file('run_pathspider.py', 'run_pathspider.py')
+    cmds = client.copy_file('remote_script.py', 'remote_script.py')
     joinall(cmds, raise_error=True)
     cmds = client.copy_file('config.json', 'config.json')
     joinall(cmds, raise_error=True)
@@ -36,7 +36,7 @@ def ssh_stuff(hosts, jobs, inputfiles):
     
     sleep(10)
 
-    #remote execute run_pathspider
+    #remote execute remote_script
     print('Run deployment script')
     client.run_command('%s', host_args = jobs, use_pty = False)
     
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         ip = get_IP(headers, id)
         print(name+':'+ip)
         hosts.append(ip)
-        jobs.append('setsid python3 run_pathspider.py ' +name+' '+plugin+' '+str(id))
+        jobs.append('setsid python3 remote_script.py ' +name+' '+plugin+' '+str(id))
         ids.append(id)
         
     # for testing purpouse
