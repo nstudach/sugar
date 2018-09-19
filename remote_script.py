@@ -8,14 +8,14 @@ letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789'
 
 # list of packages to install
 packages = [
-    'python3-setuptools',
     'libssl-dev',
     'libtrace-dev',
     'libldns-dev',
     'libcurl4-openssl-dev',
     'git-core',
     'build-essential',
-    'python3-dev'
+    'python3-dev',
+    'python3-pip'
 ]
 
 py_packages = [
@@ -40,11 +40,7 @@ def install_packets():
     # install packages via apt-get
     for package in packages:
         if call(['apt-get', 'install', '-qq', '-y', package]) == 1:
-            failed_pkg = failed_pkg + package + ' '
-
-    # use easy_install3 to get pip3. For Debian not working with apt-get
-    if call(['easy_install3', '-U', 'pip']) == 1:
-        failed_pkg = failed_pkg + package + ' '
+            failed_pkg += package + ' '
 
     # apt-get update
     call(['apt-get', '-qq', 'update'])
@@ -52,7 +48,18 @@ def install_packets():
     # install packages
     for package in py_packages:
         if call([sys.executable, '-m', 'pip', 'install', '--quiet', package]) == 1:
-            failed_pkg = failed_pkg + package + ' '
+            failed_pkg += package + ' '
+
+    # apt-get update
+    call(['apt-get', '-qq', 'update'])
+
+    if failed_pkg == '':
+        return (True, '')
+    else:
+        return (False, 'Packets: ' + failed_pkg +'\n')
+
+def install_git():
+    failed_pkg = ''
 
     # 'git clone -b uploader --single-branch https://github.com/nstudach/pathspider.git'
     ps_link = 'https://github.com/nstudach/pathspider.git'
@@ -63,17 +70,17 @@ def install_packets():
     call(['git', 'clone', lib_link])
 
     # '(cd python-libtrace/ && make install-py3)'
-    if call('(cd python-libtrace/ && make install-py3 > /dev/null 2>&1)', shell=True) == 1:
-        failed_pkg = failed_pkg + 'libtrace' + ' '
+    if call('(cd python-libtrace/ && make install-py3 > /dev/null 2>&1)', shell=True) != 0:
+        failed_pkg += 'libtrace' + ' '
 
     # '(cd pathspider/ && python3 setup.py install)'
-    if call('(cd pathspider/ && python3 setup.py install > /dev/null 2>&1)', shell=True) == 1:
-        failed_pkg = failed_pkg + 'pathspider'
+    if call('(cd pathspider/ && python3 setup.py install > /dev/null 2>&1)', shell=True) != 0:
+        failed_pkg += 'pathspider'
 
     if failed_pkg == '':
-        return (True, 'Installation successful\n')
+        return (True, '')
     else:
-        return (False,failed_pkg)
+        return (False, 'Git Repositories: ' + failed_pkg +'\n')
 
 def download_inputs():
     import requests
@@ -87,18 +94,32 @@ def download_inputs():
         i += 1
         if file.startswith('http'):
             try:
-                msg += 'Downloading inputfile from: ' + str(file) + '\n'
+                msg += 'Downloaded inputfile from: ' + str(file) + '\n'
                 r = requests.get(file)
                 new_name = ''.join(['input', str(i), '.ndjson'])
                 with open(new_name, 'wb') as f:
                     f.write(r.content)
                 config['measurement']['inputfile'][i-1] = new_name
             except:
-                msg += 'Could not download\n'
+                msg += 'Could not download ' + str(file) + '\n'
                 return (False, msg)
     with open('config.json', 'w') as outfile:
         json.dump(config, outfile)
     return (True, msg)
+
+def setup(debug):
+    success, msg = install_packets()
+    if success:
+        success, report = install_git()
+        msg += report
+        if success:
+            success, report = download_inputs()
+            if not debug:
+                msg = '' 
+            return (True, 'Setup successful\n' + msg)
+    if not debug:
+        msg = ''
+    return(False, 'Setup failed with\n' + msg)
 
 def process_stderr(filename):
     error = ''
@@ -108,9 +129,15 @@ def process_stderr(filename):
     return error
 
 def destroy_VM(headers,id):
-    url = "https://api.digitalocean.com/v2/droplets/" + str(id)
-    # delete droplet
-    requests.delete(url, headers=headers)
+    try:
+        import requests
+        url = "https://api.digitalocean.com/v2/droplets/" + str(id)
+        # delete droplet
+        requests.delete(url, headers=headers)
+    except:
+        #what if request not installed?
+        pass
+
 
 def analyze_output(filename, plugin):
     if plugin in ['dscp', 'ecn', 'evilbit', 'h2', 'udpzero']:
@@ -140,9 +167,6 @@ def search(filename, keywords):
     return json.dumps(counter)
 
 def upload(output, plugin, location, token, campaign, stderr): 
-    # Analyse output
-    msg = analyze_output(output, plugin)
-
     # Set variables
     metadata1 = 'plugin:' + plugin
     metadata2 = 'location:' + location
@@ -169,84 +193,79 @@ def measure(input, output, workers, plugin, stderr):
         return (True, 'Measurement successful: ' + input + '\n')
                 
 
-if __name__ == "__main__":  
-    success, msg = install_packets()
+if __name__ == "__main__":
+    #read config.json
+    config = json.load(open('config.json'))
+    option = config['measurement']
+    debug = option['debug']
+
+    success, msg = setup(debug)
     if success:
         # import after installation
-        import requests
         from slacker import Slacker
-        
         # setup Slack
-        config = json.load(open('config.json'))
         slackClient = Slacker(config['slack']['token'])
         channel = config['slack']['channel']
 
-        option = config['measurement']
-        debug = option['debug']
+        slackClient.chat.post_message(channel, str(sys.argv[1]) + ':\n' + msg + 'Starting measurements')
 
-        success, report = download_inputs()
-        if success:
-            if not debug:
-                slackClient.chat.post_message(channel, str(sys.argv[1]) + ': Setup successful\nStarting measurements')
+        #define some variables
+        location = str(sys.argv[1]).split('-')[1]
+        plugin = str(sys.argv[1]).split('-')[2]
+        i = 0
+
+        # start measurement for each file in config
+        for file in option['inputfile']:
+            i += 1
+            #set identifier
+            tag = str(sys.argv[1]) + 'with input ' + str(file) + ':\n'
+            output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin + str(i)
+            # set file for stderr
+            stderr = ''.join(['stderr_', str(i), '.txt'])
+    
+            # send debug msg
+            if debug:
+                msg = ' '.join([tag, 'Started measurement:', 'pspdr', 'measure', '-i', 'eth0', '--input', file, '--output', output, '-w', option['workers'], plugin,'\n'])
+                slackClient.chat.post_message(channel, msg)
+
+            # start measurement
+            success, msg = measure(file, output, option['workers'], plugin, stderr)
+            if not success:
+                # Measurement failed
+                slackClient.chat.post_message(channel, tag + msg)
             else:
-                slackClient.chat.post_message(channel, str(sys.argv[1]) + ':\n' + msg + report)  
-            #define some variables
-            location = str(sys.argv[1]).split('-')[1]
-            plugin = str(sys.argv[2])
-            i = 0
+                # Successful measurement    
+                # Analyse output
+                msg += analyze_output(output, plugin) + '\n'
 
-            # start measurement for each file in config
-            for file in option['inputfile']:
-                i += 1
-                #set identifier
-                tag = str(sys.argv[1]) + 'with input ' + str(file) + ':\n'
-                output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin + str(i)
-                # set file for stderr
-                stderr = ''.join(['stderr_', str(i), '.txt'])
-        
-                # send debug msg
                 if debug:
-                    msg = ' '.join([tag, 'Started measurement:', 'pspdr', 'measure', '-i', 'eth0', '--input', file, '--output', output, '-w', option['workers'], str(sys.argv[2]),'\n'])
                     slackClient.chat.post_message(channel, msg)
+                    msg = ''
 
-                # start measurement
-                success, report = measure(file, output, option['workers'], plugin, stderr)
+                success, report = upload(output, plugin, location, option['token'], option['campaign'], stderr)
+                msg += report
                 if not success:
-                    # Measurement failed
-                    slackClient.chat.post_message(channel, tag + report)
+                    # Upload failed
+                    slackClient.chat.post_message(channel, tag + msg)   
                 else:
-                    # Successful measurement    
-                    # Analyse output
-                    report += analyze_output(output, plugin)
-
-                    if debug:
-                        slackClient.chat.post_message(channel, report)
-                        report = ''
-
-                    success, temp = upload(output, plugin, location, option['token'], option['campaign'], stderr)
-                    report += temp
-                    if not success:
-                        # Upload failed
-                        slackClient.chat.post_message(channel, tag + report)   
-                    else:
-                        # Upload successful
-                        slackClient.chat.post_message(channel, tag + report)
-        else:
-            if not debug:
-                report = 'Could not download input files'
-            slackClient.chat.post_message(channel, str(sys.argv[1]) + ':\n' + msg + report)
+                    # Upload successful
+                    slackClient.chat.post_message(channel, tag + msg)
     else:
         # Installation failed
         try:
+            from slacker import Slacker
             # setup Slack
             config = json.load(open('config.json'))
             slackClient = Slacker(config['slack']['token'])
             channel = config['slack']['channel']  
-            slackClient.chat.post_message(channel, str(sys.argv[1]) + ': Installation failed with: ' + msg)
+            slackClient.chat.post_message(channel, str(sys.argv[1]) + ':\n' + msg)
         except:
             # Slack not installed
             pass
     
     slackClient.chat.post_message(channel, str(sys.argv[1]) + ': Destroying Droplet')
     #destroy the droplet
-    destroy_VM(config['provider']['headers'], id = str(sys.argv[3]))
+    destroy_VM(config['provider']['headers'], id = str(sys.argv[2]))
+    #if destruction failed this code will run
+    time.sleep(300)
+    slackClient.chat.post_message(channel, str(sys.argv[1]) + ': Destruction failed')

@@ -35,20 +35,20 @@ def ssh_stuff(hosts, jobs, inputfiles):
             joinall(cmds, raise_error=True)
     
     sleep(10)
-
+    
+    print('Letting the machine sleep')
+    output = client.run_command('sleep 2m')
+    #wait until finished
+    client.join(output, consume_output=False, timeout=None)
+    
     #remote execute remote_script
-    print('Run deployment script')
+    print('Starting deployment script')
+    print(jobs)
     client.run_command('%s', host_args = jobs, use_pty = False)
     
     sleep(20)
     
     print('closing connections')
-
-def print_output(hosts, output):
-    for host in hosts:
-        print(str(host))
-        for line in output[host].stdout:
-            print(line)
 
 def create_VM(headers, region, plugin, droplet_config):
     #base droplet configuration
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         ip = get_IP(headers, id)
         print(name+':'+ip)
         hosts.append(ip)
-        jobs.append('setsid python3 remote_script.py ' +name+' '+plugin+' '+str(id))
+        jobs.append('setsid python3 remote_script.py ' + name + ' ' + str(id))
         ids.append(id)
         
     # for testing purpouse
