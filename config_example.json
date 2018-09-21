@@ -4,8 +4,6 @@
         "channel": "#<<Slack Channel name>>"
     },
     "droplet":{
-        "name": "Will automatically generate",
-        "region": "Filled by entries in regions",
         "size": "s-2vcpu-2gb",
         "image": "debian-9-x64",
         "_ssh_keys_comment":"SSH KEY ID on DigitalOcean as int",
@@ -25,9 +23,17 @@
     },
     "measurement":{
         "inputfile": ["https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1", "other input files"],
+        "outputfile": [],
         "campaign": "<<PTO Campaign name>>",
         "token": "<<PTO Token>>",
-        "workers": "20",
-        "debug": false
+        "workers": "20"
+    },
+    "setup":{
+        "debug": false,
+        "hellfire": false,
+        "install": true,
+        "measure": true,
+        "upload": false,
+        "destroy": false
     }
 }
