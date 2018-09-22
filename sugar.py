@@ -15,16 +15,21 @@ def send_ssh(hosts, jobs_setup, copy, inputfiles):
         copy_files(client, inputfiles)
         sleep(10)
 
-    print('Updating configs')
     if type(jobs_setup) == list:
+        print('Setting up configs')
+        # => install mode
         output = client.run_command('%s', host_args = jobs_setup)
         client.join(output, consume_output=False, timeout=None)
+        print('Installing programs')
+        output = client.run_command("python3 -c 'import remote_script; remote_script.install()'")
+        client.join(output, consume_output=False, timeout=None)
     else:
+        print('Updating configs')
         output = client.run_command(jobs_setup)
         client.join(output, consume_output=False, timeout=None)
     #execute remote_script
     print('Starting deployment script')
-    # client.run_command('setsid python3 remote_script.py', use_pty = False)
+    client.run_command('setsid python3 remote_script.py', use_pty = False)
     
     sleep(20)
 
@@ -52,15 +57,15 @@ def get_info_from_config(config):
         if config['setup']['install']:
             copy = True
             jobs_setup = ['python3 update_config.py ' + 'name=' + name + ' id=' + str(id) for name, ip, id in host_info]
-            print(jobs_setup)
+            # print(jobs_setup)
         else:
-            #update config
+            # update config
             copy = False
             jobs_setup = ['python3', 'update_config.py']
             for tag in ['debug', 'install', 'measure', 'upload', 'destroy']:
-                jobs_setup.append(tag + '=' + config['setup'][tag])
+                jobs_setup.append(tag + '=' + str(config['setup'][tag]))
             jobs_setup = ' '.join(jobs_setup)
-            print(jobs_setup)
+            # print(jobs_setup)
     except:
         print('Something wrong with config.json.\nCould not read host info')
         print(host_info)

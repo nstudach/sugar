@@ -230,43 +230,54 @@ def post(tag, lines):
 def write_conf(config):
     json.dump(config, open('config.json', 'w'), indent=4)
 
+def install():
+    global config
+    debug = config['setup']['debug']
+    name = config['setup']['name']
+
+    success, report = setup()
+    if success:
+        #successfully installed, write to config
+        config['setup']['install complete'] = True
+        write_conf(config)
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
+        if not debug:
+            report = []
+        if config['setup']['measure']:
+            report.append('Starting measurements')
+        post(name, ['Setup successful'] + report)
+        sys.exit([0])
+    else:
+        # Installation failed, write in config
+        config['setup']['install complete'] = False
+        write_conf(config)
+        try:
+            initialize_slack(config['slack']['token'], config['slack']['channel'])
+            if not debug:
+                report = []
+            post(name, ['Setup failed'] + report)
+        except:
+            # Slack not installed
+            pass
+        sys.exit([1])
+
 if __name__ == "__main__":
     debug = config['setup']['debug']
     #def variables
     name = config['setup']['name']
     location, plugin = name.split('-')[1:3]
 
-    if config['setup']['install']:
-        success, report = setup()
-        if success:
-            #successfully installed, write to config
-            config['setup']['install complete'] = True
-            write_conf(config)
-            initialize_slack(config['slack']['token'], config['slack']['channel'])
-            if not debug:
-                report = []
-            if config['setup']['measure']:
-                report.append('Starting measurements')
-            post(name, ['Setup successful'] + report)
-        else:
-            # Installation failed, write in config
-            config['setup']['install complete'] = False
-            write_conf(config)
-            try:
-                from slacker import Slacker
-                initialize_slack(config['slack']['token'], config['slack']['channel'])
-                if not debug:
-                    report = []
-                post(name, ['Setup failed'] + report)
-            except:
-                # Slack not installed
-                pass
+    # if config['setup']['install']:
+    #     install()
 
     if config['setup']['measure'] or config['setup']['upload']:
         option = config['measurement']
         all_filenames = name_files(option['inputfile'], option['outputfile'], location, plugin)
 
     if config['setup']['measure'] and config['setup']['install complete']:
+        # setup slack if needed
+        if slackClient == None:
+            initialize_slack(config['slack']['token'], config['slack']['channel'])
         # prepare measurement
         for filenames in all_filenames:
             input, output, stderr = filenames
