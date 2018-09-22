@@ -7,11 +7,11 @@ def update_setup(file, fields):
     config = read_config(file)
     for field in fields:
         tag, value = field.split('=')
-        if tag == 'all':
-            for option in options:
-                config['setup'][option] = value
-        else:
-            config['setup'][tag] = value
+        if value == 'False':
+            value = False
+        elif value == 'True':
+            value = True
+        config['setup'][tag] = value
     write_config(file, config)
 
 def clean_config(file):
