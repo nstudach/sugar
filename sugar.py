@@ -140,19 +140,28 @@ def sleep(seconds):
 if __name__ == "__main__":
     #read_conf
     config = json.load(open('config.json'))
-    
+    overwrite = True
+
     if config['setup']['create']:
-        host_info = setup_droplets(config, str(sys.argv[1]))
-        # writing host inforamtion in config
-        config['setup']['host info'] = host_info
-        json.dump(config, open('config.json', 'w'), indent=4)   
-        print ('Created droplets.')
-        if config['setup']['install']:
-            sleep(50)
-    if config['setup']['install'] or config['setup']['measure'] or config['setup']['upload'] or config['setup']['destroy']:
-        try:
-            hosts, jobs_setup, copy = get_info_from_config(config)
-            send_ssh(hosts, jobs_setup, copy, config['measurement']['inputfile'])
-            print('Disconnected from hosts! Progress will be displayed on the slack channel.')
-        except:
-            pass
+        if 'host info' in config['setup']:
+            answer = input('Do you want to override the current host information?\ny or yes to continue:')
+            if answer not in ['y', 'yes']:
+                overwrite = False
+    
+    if overwrite:
+        if config['setup']['create']:
+            host_info = setup_droplets(config, str(sys.argv[1]))
+            # writing host inforamtion in config
+            config['setup']['host info'] = host_info
+            json.dump(config, open('config.json', 'w'), indent=4)   
+            print ('Created droplets.')
+            if config['setup']['install']:
+                sleep(50)
+        
+        if config['setup']['install'] or config['setup']['measure'] or config['setup']['upload'] or config['setup']['destroy']:
+            try:
+                hosts, jobs_setup, copy = get_info_from_config(config)
+                send_ssh(hosts, jobs_setup, copy, config['measurement']['inputfile'])
+                print('Disconnected from hosts! Progress will be displayed on the slack channel.')
+            except:
+                pass
