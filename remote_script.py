@@ -210,16 +210,21 @@ def name_files(inputs, outputs, location, plugin):
     return [(input, output, output +  '_stderr') for input, output in in_out]
 
 def initialize_slack(token, channel):
-    try:
-        from slacker import Slacker
-        global slackClient
-        slackClient = Slacker(token)
-        global s_channel
-        s_channel = channel
+    global slackClient
+    global s_channel
+    if slackClient == None:
+        try:
+            from slacker import Slacker
+            
+            slackClient = Slacker(token)
+            
+            s_channel = channel
+            return True
+        except:
+            print('Could not start Slack Client')
+            return False
+    else:
         return True
-    except:
-        print('Could not start Slack Client')
-        return False
 
 def post(tag, lines):
     tag += ':\n'
@@ -267,17 +272,14 @@ if __name__ == "__main__":
     name = config['setup']['name']
     location, plugin = name.split('-')[1:3]
 
-    # if config['setup']['install']:
-    #     install()
-
-    if config['setup']['measure'] or config['setup']['upload']:
-        option = config['measurement']
-        all_filenames = name_files(option['inputfile'], option['outputfile'], location, plugin)
+    if config['setup']['install complete']:
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
+    
+        if config['setup']['measure'] or config['setup']['upload']:
+            option = config['measurement']
+            all_filenames = name_files(option['inputfile'], option['outputfile'], location, plugin)
 
     if config['setup']['measure'] and config['setup']['install complete']:
-        # setup slack if needed
-        if slackClient == None:
-            initialize_slack(config['slack']['token'], config['slack']['channel'])
         # prepare measurement
         for filenames in all_filenames:
             input, output, stderr = filenames
@@ -310,6 +312,7 @@ if __name__ == "__main__":
                 post(tag, ['Upload failed:'] + report)  
 
     if config['setup']['destroy']:
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
         post(name, ['Destroying Droplet'])
         #destroy the droplet
         destroy_VM(config['provider']['headers'], config['setup']['id'])
