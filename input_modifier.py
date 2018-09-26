@@ -2,11 +2,16 @@
 import json
 import sys
 
-def clean(jf):
+def clean_old(jf):
     if 'dp' in jf:
         return json.dumps({'dip':jf['dip'], 'domain':jf['domain'], 'dp':jf['dp']}) + '\n'
     else:
         return json.dumps({'dip':jf['dip'], 'domain':jf['domain']}) + '\n'        
+
+def clean(jf):
+    for tag in ["hellfire_lookup_attempts", "hellfire_lookup_type"]:
+        jf.pop(tag, None)
+    return json.dumps(jf) + '\n'
 
 def read_lines(filename):
     '''
@@ -20,7 +25,6 @@ def read_lines(filename):
                 print('line is not json format')
                 print(line)
 
-
 if __name__ == "__main__":
 
     # ARGs
@@ -33,12 +37,9 @@ if __name__ == "__main__":
 
     if mode == 'clean':
         print('clean')
-        ranks = []
         with open(sys.argv[2], 'w') as outfile:
             for line in read_lines(sys.argv[1]):
-                if line['rank'] not in ranks:
-                    ranks.append(line['rank'])
-                    outfile.write(clean(line))
+                outfile.write(clean(line))
 
     elif mode == 'split':
         print('split')
@@ -60,22 +61,17 @@ if __name__ == "__main__":
     elif mode == 'both':
         print('both')
         junk_size = int(sys.argv[4])
-        #entry counter
+        # entry counter
         i = 0
         # file counter
         k = 1
         outfile = open(sys.argv[2] + '_' + str(k), 'a+') 
-        ranks = []
         for line in read_lines(sys.argv[1]):
             if i < junk_size:
-                if line['rank'] not in ranks:
-                    ranks.append(line['rank'])
-                    i += 1
-                    outfile.write(clean(line))
+                i += 1
+                outfile.write(clean(line))
             else:
                 i = 0
-                #reset ranks for speed
-                ranks = []
                 k += 1
                 outfile = open(sys.argv[2] + '_' + str(k), 'a+')
 
