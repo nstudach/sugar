@@ -82,7 +82,7 @@ def setup_droplets(config, plugin):
 
     for region in regions:
         id, name = create_VM(headers, region, plugin, droplet_config)
-        time.sleeping(10)
+        time.sleep(10)
         ip = get_IP(headers, id)
         print(name+':'+ip)
         if ip != 'no ip':
