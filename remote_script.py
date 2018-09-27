@@ -2,6 +2,7 @@ import time
 import os
 import sys
 import json
+import string
 import random
 from subprocess import call
 from collections import defaultdict
@@ -195,7 +196,7 @@ def name_files(inputs, outputs, location, plugin):
     '''
     returns a list of tuple with tuple = (input, output, stderr) (names)
     '''
-    letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789'
+    letters = string.ascii_letters + string.digits
     if len(inputs) != len(outputs):
         global config
         pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
@@ -204,7 +205,7 @@ def name_files(inputs, outputs, location, plugin):
         config['measurement']['outputfile'] = [y for x,y in in_out]
         write_conf(config)    
     else:
-        in_out = [(inputs[i], outputs[i]) for i in range(len(inputs))]
+        in_out = [(inputs[i], location + '-' + outputs[i]) for i in range(len(inputs))]
     return [(input, output, output +  '_stderr') for input, output in in_out]
 
 def initialize_slack(token, channel):
