@@ -13,7 +13,7 @@ def send_ssh(hosts, jobs_setup, copy, inputfiles):
     if copy:
         print('Start copying files')
         copy_files(client, inputfiles)
-        sleep(10)
+        sleeping(10)
 
     if type(jobs_setup) == list:
         print('Setting up configs')
@@ -31,7 +31,7 @@ def send_ssh(hosts, jobs_setup, copy, inputfiles):
     print('Starting deployment script')
     client.run_command('setsid python3 remote_script.py', use_pty = False)
     
-    sleep(20)
+    sleeping(20)
 
 def copy_files(client, inputfiles):
     # copy remote_script, input files, config file
@@ -82,7 +82,7 @@ def setup_droplets(config, plugin):
 
     for region in regions:
         id, name = create_VM(headers, region, plugin, droplet_config)
-        time.sleep(10)
+        time.sleeping(10)
         ip = get_IP(headers, id)
         print(name+':'+ip)
         if ip != 'no ip':
@@ -106,7 +106,7 @@ def create_VM(headers, region, plugin, droplet_config):
     except:
         print(data)
         print ('retry')
-        sleep(20)
+        sleeping(20)
         r = requests.post(url, data=json.dumps(droplet_config), headers=headers)
         data = r.json()
         print(droplet_config['name']+':'+str(data['droplet']['id']))
@@ -122,7 +122,7 @@ def get_IP(headers, id):
     except:
         for _ in range(3):
             print ('Digital Ocean not yet ready.\nretry')
-            sleep(20)
+            sleeping(20)
             r = requests.get(url, headers=headers)
             data= r.json()
             try:
@@ -133,7 +133,7 @@ def get_IP(headers, id):
         requests.delete(url, headers=headers)
         return 'no ip'
 
-def sleep(seconds):
+def sleeping(seconds):
     print('Sleeping for %d sec' % seconds)
     time.sleep(seconds)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
             json.dump(config, open('config.json', 'w'), indent=4)   
             print ('Created droplets.')
             if config['setup']['install']:
-                sleep(50)
+                sleeping(50)
         
         if config['setup']['install'] or config['setup']['measure'] or config['setup']['upload'] or config['setup']['destroy']:
             try:
