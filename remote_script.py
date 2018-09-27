@@ -4,6 +4,7 @@ import sys
 import json
 import random
 from subprocess import call
+from collections import defaultdict
 
 # global config avoids refreshes
 config = json.load(open('config.json'))
@@ -160,10 +161,7 @@ def search(filename, keywords):
     Searches each line of file for one keyword
     Returns percentage of lines containig each keyword as string
     '''
-    counter = {}
-    counter['total'] = 0
-    for keyword in keywords:
-        counter[keyword]=0
+    counter = defaultdict(int)
 
     with open(filename, 'r') as input:
         for line in input.readlines():
