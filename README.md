@@ -1,7 +1,10 @@
 
 # sugar
 
-Automatic set up of DigitalOcean VM's and execution of pathspider with upload to MAMI PTO
+This program is written to automate internet path transparency measurements for the MAMI project.
+
+It creates virtual machines at different locations in the internet and sets them up to run pathspider on them.
+It can upload the measurements directly to the MAMI PTO and destroy each droplet after a succesfull or failed run.
 
 ## 1. Config file
 
@@ -28,10 +31,21 @@ The config consists of 4 parts:
 ### "measurement" for measurement parameters
 
 * **"inputfile"**: List of strings representing either a filename or a link to a downloadable file
+* **"outputfile"**: You can name your outputfiles here. List must be same lenght as inputfile or it will be ignored. Wont work with upload and multiple VM's due to identical names
 * **"campaign"**: Your PTO campaign name as string
 * **"token"**: Your PTO access token as string
 * **"workers"**: number of workers
-* **"debug"**: activate debug mode (_true_/_false_). More information posted to slack channel
+
+### "setup" Defines task to execute
+
+* **"debug"**: (_true_/_false_): activate debug mode. More information posted to slack channel
+* **"hellfire"**: (_true_/_false_): Downloads new input file via hellfire
+* **"create"**: (_true_/_false_): Creates VM's.
+* **"install"**: (_true_/_false_): Sets up VM's
+* **"measure""**: (_true_/_false_): Enables Measurement
+* **"upload"**: (_true_/_false_): Enables upload
+* **"destroy"**: (_true_/_false_): Destroys droplets after completion of all tasks
+* **"host info"**: Stores current host information after Creation (leave empty if no droplets exist yet)
 
 ## 2. SSH Key
 
@@ -41,6 +55,6 @@ The SSH Private key must be placed in the folder keys with the names `id_rsa` an
 
 The program is started through the terminal. As only parameter you need to specify the pathspider plugin to use. See `pspdr measure -h` for more information. You can run multiple plugin measurements simultaniously as long as your Digital Ocean account supports the large amount of droplets.
 
-`python3 create_droplet PLUGIN`
+`python3 sugar.py PLUGIN`
 
-The program will create a local file containing the commands to delete each droplet as well as their IP address for an manual ssh connection.
+The program will save the host names, ip addresses, and id's in the config.json file.
