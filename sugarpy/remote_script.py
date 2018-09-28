@@ -23,7 +23,8 @@ def install_packets():
         'git',
         'build-essential',
         'python3-dev',
-        'python3-pip'
+        'python3-pip',
+        'tcpdump'
     ]
 
     py_packages = [
@@ -109,6 +110,9 @@ def download_inputs():
             except:
                 msg.append('Could not download ' + str(file))
                 return (False, msg)
+        else:
+            # remove path before filename
+            config['measurement']['inputfile'][i-1] = os.path.basename(file)
     write_conf(config)  
     return (True, msg)
 
