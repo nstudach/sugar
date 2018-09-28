@@ -9,9 +9,9 @@ from pssh.clients import ParallelSSHClient
 from pssh.utils import enable_logger, logger
 from gevent import joinall
 
-def initialize_client(hosts):
+def initialize_client(hosts, key):
     enable_logger(logger)
-    return ParallelSSHClient(hosts, user = 'root', pkey = 'keys/id_rsa')
+    return ParallelSSHClient(hosts, user = 'root', pkey = key)
 
 def send_ssh(client, jobs_setup):
     if type(jobs_setup) == list:
@@ -138,6 +138,7 @@ def sleeping(seconds):
     time.sleep(seconds)
 
 def main(args):
+    key = args.key
     #read_conf
     config = json.load(open(args.config))
     overwrite = True
@@ -160,7 +161,7 @@ def main(args):
         
         if config['setup']['install'] or config['setup']['measure'] or config['setup']['upload'] or config['setup']['destroy']:
             hosts, jobs_setup, copy = get_info_from_config(config)
-            client = initialize_client(hosts)
+            client = initialize_client(hosts, key)
             if copy: copy_files(client, args.config, config['measurement']['inputfile'])
             send_ssh(client, jobs_setup)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
@@ -168,7 +169,8 @@ def main(args):
 def comand_line_parser():
     parser = argparse.ArgumentParser(description = 'Manage automated pathspider measurements')
     parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin', required = True)
-    parser.add_argument('--config', help = 'Path to config file', metavar = 'filename', default='config.json',)
+    parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location', default = 'config.json',)
+    parser.add_argument('--key', help = 'Path to ssh authentication key', metavar = 'file-location', default = 'keys/id_rsa',)   
     parser.set_defaults(func = main)
     args=parser.parse_args()
     args.func(args)
