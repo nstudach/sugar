@@ -3,7 +3,7 @@ from setuptools import setup
 with open('requirements.txt') as f:
     install_requires = f.read().splitlines()
 
-setup(name = 'sugar',
+s = setup(name = 'sugar',
       version = '0.1',
       description = 'Automated Internet Path Transparency Measurements',
       url = 'http://github.com/nstudach/sugar',
@@ -34,3 +34,6 @@ setup(name = 'sugar',
         ],
       },
       zip_safe = False)
+
+installation_path = s.command_obj['install'].install_lib
+print('Installation path is: ' + installation_path)

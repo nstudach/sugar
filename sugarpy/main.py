@@ -9,6 +9,16 @@ from pssh.clients import ParallelSSHClient
 from pssh.utils import enable_logger, logger
 from gevent import joinall
 
+def inject_location(path):
+    '''
+    Saves the installation location
+    '''
+    pass
+
+def here():
+    from subprocess import call
+    call(['touch', 'this_is_here'])
+    
 def initialize_client(hosts):
     enable_logger(logger)
     return ParallelSSHClient(hosts, user = 'root', pkey = 'keys/id_rsa')
