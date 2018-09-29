@@ -6,7 +6,30 @@ This program is written to automate internet path transparency measurements for 
 It creates virtual machines at different locations in the internet and sets them up to run pathspider on them.
 It can upload the measurements directly to the MAMI PTO and destroy each droplet after a succesfull or failed run.
 
-## 1. Config file
+## 1. Installation
+
+You can install sugar by:
+
+1. Cloning this git repository
+1. In the folder sugar run `sudo python3 setup.py install`
+
+## 2. Usage
+
+Sugar can be run in the terminal with `sugar -h`
+Currently it is required to run sugar from within the sugar folder.
+The reason is that sugar will copy files to the remote servers and the location is hard coded.
+
+The possible arguments are:
+
+* **--config** Expects the path to the config file (See 3. about configuring the file)
+* **--plugin** The pathspider plugin you want to use (See: pathspider.com)
+* **--key** The location of the SSH keypair (See 4.)
+
+You can run multiple plugin measurements simultaniously as long as your Digital Ocean account supports the large amount of droplets.
+
+The program will save the host names, ip addresses, and id's in the config.json file.
+
+## 3. Configure Sugar
 
 Enter all the required parameter in a config.json file. The config_example.json will help you here.
 The config consists of 4 parts:
@@ -47,14 +70,6 @@ The config consists of 4 parts:
 * **"destroy"**: (_true_/_false_): Destroys droplets after completion of all tasks
 * **"host info"**: Stores current host information after Creation (leave empty if no droplets exist yet)
 
-## 2. SSH Key
+## 4. SSH Key
 
 The SSH Private key must be placed in the folder keys with the names `id_rsa` and `id_rsa.pub`
-
-## 3. Usage
-
-The program is started through the terminal. As only parameter you need to specify the pathspider plugin to use. See `pspdr measure -h` for more information. You can run multiple plugin measurements simultaniously as long as your Digital Ocean account supports the large amount of droplets.
-
-`python3 sugar.py PLUGIN`
-
-The program will save the host names, ip addresses, and id's in the config.json file.
