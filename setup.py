@@ -37,3 +37,6 @@ s = setup(name = 'sugar',
 
 installation_path = s.command_obj['install'].install_lib
 print('Installation path is: ' + installation_path)
+filename = 'installation-path.txt'
+installation_path += 'sugar-0.1-py3.6.egg/sugarpy/'
+open(filename, 'w').write(installation_path)
