@@ -6,7 +6,6 @@
     "droplet":{
         "size": "s-2vcpu-2gb",
         "image": "debian-9-x64",
-        "_ssh_keys_comment":"SSH KEY ID on DigitalOcean as int",
         "ssh_keys": [1234],
         "backups": false,
         "ipv6": true,
@@ -21,14 +20,43 @@
         },
         "regions": ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", "sfo2", "sgp1", "tor1"]
     },
-    "measurement":{
+    "measure":{
+        "plugin": "ecn",
         "inputfile": ["https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1", "other input files"],
         "outputfile": [],
-        "campaign": "<<PTO Campaign name>>",
-        "token": "<<PTO Token>>",
         "workers": "20"
     },
-    "setup":{
+    "upload": {
+        "campaign": "<<PTO Campaign name>>",
+        "token": "<<PTO Token>>"
+    },
+    "install": {
+        "packages": [
+            "libssl-dev",
+            "libtrace-dev",
+            "libldns-dev",
+            "libcurl4-openssl-dev",
+            "git",
+            "build-essential",
+            "python3-dev",
+            "python3-pip",
+            "tcpdump"
+        ],
+        "py_packages": [
+            "straight.plugin",
+            "pyroute2",
+            "scapy-python3",
+            "stem",
+            "dnslib",
+            "pycurl",
+            "nose",
+            "python-dateutil",
+            "slackClient",
+            "slacker",
+            "requests"
+        ]
+    },
+    "task":{
         "debug": false,
         "hellfire": false,
         "install": true,
