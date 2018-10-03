@@ -32,11 +32,13 @@ def send_ssh(client, jobs_setup):
     sleeping(20)
 
 def copy_files(client, configfile, inputfiles):
+    # get install directory where scripts are located
+    install_dir = open('/opt/sugar/installation-path.txt', 'r').readline()
     print('Start copying files')
     # copy remote_script, input files, config file
-    cmds = client.copy_file('sugarpy/remote_script.py', 'remote_script.py')
+    cmds = client.copy_file(install_dir + 'remote_script.py', 'remote_script.py')
     joinall(cmds, raise_error=True)
-    cmds = client.copy_file('sugarpy/update_config.py', 'update_config.py')
+    cmds = client.copy_file(install_dir + 'update_config.py', 'update_config.py')
     joinall(cmds, raise_error=True)
     cmds = client.copy_file(configfile, 'config.json')
     joinall(cmds, raise_error=True)

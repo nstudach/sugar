@@ -1,7 +1,8 @@
+import os
 from setuptools import setup
 
 with open('requirements.txt') as f:
-    install_requires = f.read().splitlines()
+  install_requires = f.read().splitlines()
 
 s = setup(name = 'sugar',
       version = '0.1',
@@ -36,7 +37,13 @@ s = setup(name = 'sugar',
       zip_safe = False)
 
 installation_path = s.command_obj['install'].install_lib
-print('Installation path is: ' + installation_path)
+# print('Installation path is: ' + installation_path)
 filename = 'installation-path.txt'
+#how to determin name
 installation_path += 'sugar-0.1-py3.6.egg/sugarpy/'
-open(filename, 'w').write(installation_path)
+appdata = '/opt/sugar/'
+if not os.path.isdir(appdata):
+  os.mkdir(appdata) 
+open('/opt/sugar/' + filename, 'w').write(installation_path)
+
+  
