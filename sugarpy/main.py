@@ -9,9 +9,9 @@ from pssh.clients import ParallelSSHClient
 from pssh.utils import enable_logger, logger
 from gevent import joinall
 
-def initialize_client(hosts):
+def initialize_client(hosts, key):
     enable_logger(logger)
-    return ParallelSSHClient(hosts, user = 'root', pkey = 'keys/id_rsa')
+    return ParallelSSHClient(hosts, user = 'root', pkey = key)
 
 def send_ssh(client, jobs_setup):
     if type(jobs_setup) == list:
@@ -20,7 +20,7 @@ def send_ssh(client, jobs_setup):
         output = client.run_command('%s', host_args = jobs_setup)
         client.join(output, consume_output=False, timeout=None)
         print('Installing programs')
-        output = client.run_command("python3 -c 'import remote_script; remote_script.install()'")
+        output = client.run_command("python3 -c 'from remote_script import *; install_all()'")
         client.join(output, consume_output=False, timeout=None)
     else:
         print('Updating configs')
@@ -54,7 +54,7 @@ def get_info_from_config(config):
         return False
     try:
         hosts = [ip for name, ip, id in host_info]
-        if config['setup']['install']:
+        if config['task']['install']:
             copy = True
             jobs_setup = ['python3 update_config.py ' + 'name=' + name + ' id=' + str(id) for name, ip, id in host_info]
             # print(jobs_setup)
@@ -63,7 +63,7 @@ def get_info_from_config(config):
             copy = False
             jobs_setup = ['python3', 'update_config.py']
             for tag in ['debug', 'install', 'measure', 'upload', 'destroy']:
-                jobs_setup.append(tag + '=' + str(config['setup'][tag]))
+                jobs_setup.append(tag + '=' + str(config['task'][tag]))
             jobs_setup = ' '.join(jobs_setup)
             # print(jobs_setup)
     except:
@@ -137,38 +137,49 @@ def sleeping(seconds):
     print('Sleeping for %d sec' % seconds)
     time.sleep(seconds)
 
-def main(args):
-    #read_conf
-    config = json.load(open(args.config))
+def main(configfile):
+    config = json.load(open(configfile))
     overwrite = True
 
-    if config['setup']['create']:
+    if config['task']['create']:
         if 'host info' in config['setup']:
             answer = input('Do you want to override the current host information?\ny or yes to continue:')
             if answer not in ['y', 'yes']:
                 overwrite = False
-    
+
     if overwrite:
-        if config['setup']['create']:
-            host_info = setup_droplets(config, args.plugin)
+        if config['task']['create']:
+            host_info = setup_droplets(config, config['measure']['plugin'])
             # writing host inforamtion in config
             config['setup']['host info'] = host_info
-            json.dump(config, open(args.config, 'w'), indent=4)   
+            json.dump(config, open(configfile, 'w'), indent=4)   
             print ('Created droplets.')
-            if config['setup']['install']:
+            if config['task']['install']:
                 sleeping(50)
         
-        if config['setup']['install'] or config['setup']['measure'] or config['setup']['upload'] or config['setup']['destroy']:
+        if config['task']['install'] or config['task']['measure'] or config['task']['upload'] or config['task']['destroy']:
             hosts, jobs_setup, copy = get_info_from_config(config)
-            client = initialize_client(hosts)
-            if copy: copy_files(client, args.config, config['measurement']['inputfile'])
+            client = initialize_client(hosts, config['setup']['ssh key'])
+            if copy: copy_files(client, configfile, config['measure']['inputfile'])
             send_ssh(client, jobs_setup)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
 
 def comand_line_parser():
     parser = argparse.ArgumentParser(description = 'Manage automated pathspider measurements')
-    parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin', required = True)
-    parser.add_argument('--config', help = 'Path to config file', metavar = 'filename', default='config.json',)
+    parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin')
+    parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location', default = 'configs/config.json')
+    parser.add_argument('--key', help = 'Path to ssh authentication key', metavar = 'file-location')   
     parser.set_defaults(func = main)
     args=parser.parse_args()
-    args.func(args)
+
+    # add key and plugin to config NOT WORKING
+    config = json.load(open(args.config))
+    if args.key is not None:
+        config['setup']['ssh key'] = args.key
+    if args.plugin is not None:
+        config['measure']['plugin'] = args.plugin
+    elif'plugin' not in config['measure']:
+        config['measure']['plugin'] = 'droplet'
+    json.dump(config, open(args.config, 'w'), indent=4)
+
+    args.func(args.config)

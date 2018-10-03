@@ -14,39 +14,12 @@ slackClient = None
 s_channel = None
 
 def install_packets():
-    # list of packages to install
-    packages = [
-        'libssl-dev',
-        'libtrace-dev',
-        'libldns-dev',
-        'libcurl4-openssl-dev',
-        'git',
-        'build-essential',
-        'python3-dev',
-        'python3-pip',
-        'tcpdump'
-    ]
-
-    py_packages = [
-        'straight.plugin',
-        'pyroute2',
-        'scapy-python3',
-        'stem',
-        'dnslib',
-        'pycurl',
-        'nose',
-        'python-dateutil',
-        'slackClient',
-        'slacker',
-        'requests'
-    ]
-    
     failed_pkg = ''
     # apt-get update
     call(['apt-get', '-qq', 'update'])
 
     # install packages via apt-get
-    for package in packages:
+    for package in config['install']['packages']:
         if call(['apt-get', 'install', '-qq', '-y', package]) == 1:
             failed_pkg += package + ' '
 
@@ -54,7 +27,7 @@ def install_packets():
     call(['apt-get', '-qq', 'update'])
 
     # install packages
-    for package in py_packages:
+    for package in config['install']['py_packages']:
         if call([sys.executable, '-m', 'pip', 'install', '--quiet', package]) == 1:
             failed_pkg += package + ' '
 
@@ -97,7 +70,7 @@ def download_inputs():
     #download input file if needed
     msg = []
     i = 0
-    for file in config['measurement']['inputfile']:
+    for file in config['measure']['inputfile']:
         i += 1
         if file.startswith('http'):
             try:
@@ -106,13 +79,13 @@ def download_inputs():
                 new_name = ''.join(['input', str(i), '.ndjson'])
                 with open(new_name, 'wb') as f:
                     f.write(r.content)
-                config['measurement']['inputfile'][i-1] = new_name
+                config['measure']['inputfile'][i-1] = new_name
             except:
                 msg.append('Could not download ' + str(file))
                 return (False, msg)
         else:
             # remove path before filename
-            config['measurement']['inputfile'][i-1] = os.path.basename(file)
+            config['measure']['inputfile'][i-1] = os.path.basename(file)
     write_conf(config)  
     return (True, msg)
 
@@ -206,7 +179,7 @@ def name_files(inputs, outputs, location, plugin):
         pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
         in_out = [(inputs[i], pre_output + '-' + str(i)) for i in range(len(inputs))]
         # write new outputs in config
-        config['measurement']['outputfile'] = [y for x,y in in_out]
+        config['measure']['outputfile'] = [y for x,y in in_out]
         write_conf(config)    
     else:
         in_out = [(inputs[i], location + '-' + outputs[i]) for i in range(len(inputs))]
@@ -238,26 +211,26 @@ def post(tag, lines):
 def write_conf(config):
     json.dump(config, open('config.json', 'w'), indent=4)
 
-def install():
+def install_all():
     global config
-    debug = config['setup']['debug']
-    name = config['setup']['name']
+    debug = config['task']['debug']
+    name = config['slack']['name']
 
     success, report = setup()
     if success:
         #successfully installed, write to config
-        config['setup']['install complete'] = True
+        config['install']['install complete'] = True
         write_conf(config)
         initialize_slack(config['slack']['token'], config['slack']['channel'])
         if not debug:
             report = []
-        if config['setup']['measure']:
+        if config['task']['measure']:
             report.append('Starting measurements')
         post(name, ['Setup successful'] + report)
         sys.exit([0])
     else:
         # Installation failed, write in config
-        config['setup']['install complete'] = False
+        config['install']['install complete'] = False
         write_conf(config)
         try:
             initialize_slack(config['slack']['token'], config['slack']['channel'])
@@ -270,19 +243,20 @@ def install():
         sys.exit([1])
 
 if __name__ == "__main__":
-    debug = config['setup']['debug']
+    debug = config['task']['debug']
     #def variables
-    name = config['setup']['name']
-    location, plugin = name.split('-')[1:3]
+    name = config['slack']['name']
+    location = config['upload']['location']
+    plugin = config['measure']['plugin']
 
-    if config['setup']['install complete']:
+    if config['install']['install complete']:
         initialize_slack(config['slack']['token'], config['slack']['channel'])
     
-        if config['setup']['measure'] or config['setup']['upload']:
-            option = config['measurement']
+        if config['task']['measure'] or config['task']['upload']:
+            option = config['measure']
             all_filenames = name_files(option['inputfile'], option['outputfile'], location, plugin)
 
-    if config['setup']['measure'] and config['setup']['install complete']:
+    if config['task']['measure'] and config['install']['install complete']:
         # prepare measurement
         for filenames in all_filenames:
             input, output, stderr = filenames
@@ -301,7 +275,7 @@ if __name__ == "__main__":
                     report = []
                 post(tag, ['Measurement failed:'] + report)
 
-    if config['setup']['upload'] and config['setup']['install complete']:
+    if config['task']['upload'] and config['install']['install complete']:
         #upload file
         for filenames in all_filenames:
             input, output, stderr = filenames
@@ -314,11 +288,11 @@ if __name__ == "__main__":
                 # Upload failed
                 post(tag, ['Upload failed:'] + report)  
 
-    if config['setup']['destroy']:
+    if config['task']['destroy']:
         initialize_slack(config['slack']['token'], config['slack']['channel'])
         post(name, ['Destroying Droplet'])
         #destroy the droplet
-        destroy_VM(config['provider']['headers'], config['setup']['id'])
+        destroy_VM(config['provider']['headers'], config['destroy']['id'])
         #if destruction failed this code will run
         time.sleep(300)
         post(name, ['Destruction failed'])
