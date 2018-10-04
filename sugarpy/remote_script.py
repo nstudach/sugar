@@ -13,6 +13,61 @@ config = json.load(open('config.json'))
 slackClient = None
 s_channel = None
 
+##################################################################
+# INSTALLATION FUNCTIONS
+##################################################################
+
+def install_all():
+    global config
+    debug = config['task']['debug']
+    name = config['slack']['name']
+
+    success, report = setup()
+    if success:
+        #successfully installed, write to config
+        config['install']['install complete'] = True
+        write_conf(config)
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
+        if not debug:
+            report = []
+        if config['task']['measure']:
+            report.append('Starting measurements')
+        post(name, ['Setup successful'] + report)
+        sys.exit([0])
+    else:
+        # Installation failed, write in config
+        config['install']['install complete'] = False
+        write_conf(config)
+        try:
+            initialize_slack(config['slack']['token'], config['slack']['channel'])
+            if not debug:
+                report = []
+            post(name, ['Setup failed'] + report)
+        except:
+            # Slack not installed
+            pass
+        sys.exit([1])
+
+def setup():
+    packets = False
+    gits = False
+    inputs = False
+    msg = []
+    for _ in range(3):
+        if not packets:
+            packets, report = install_packets()
+            msg.extend(report)
+        if not gits:    
+            gits, report = install_git()
+            msg.extend(report)
+        if not inputs:
+            inputs, report = download_inputs()
+            msg.extend(report)
+        if packets and gits and input:
+            return (True, msg)
+        msg.extend(['Retry'])
+    return(False, msg)
+
 def install_packets():
     failed_pkg = ''
     # apt-get update
@@ -89,42 +144,133 @@ def download_inputs():
     write_conf(config)  
     return (True, msg)
 
-def setup():
-    packets = False
-    gits = False
-    inputs = False
+##################################################################
+# HELLFIRE FUNCTIONS
+##################################################################
+
+def install_go(link, name):
     msg = []
-    for _ in range(3):
-        if not packets:
-            packets, report = install_packets()
-            msg.extend(report)
-        if not gits:    
-            gits, report = install_git()
-            msg.extend(report)
-        if not inputs:
-            inputs, report = download_inputs()
-            msg.extend(report)
-        if packets and gits and input:
+    try:
+        if not os.path.isfile(name):
+            import requests
+            r = requests.get(link)
+            open(name, 'wb').write(r.content)
+            msg.append('Downloaded %s as file %s' % (link, name))
+    except:
+        return (False, 'Could not download go tar.gz')
+
+    if not os.path.isdir('/root/go'):
+        if call(['tar', 'xvf', name]) == 0:
+            msg.append('Extracted ' + name)
+        else:
+            msg.append('Go extraction failed')
+    else:
+        msg.append('Tar already extracted')
+    
+
+    x =  call(['/root/go/bin/go', 'version'])
+    msg.append('Return code is ' + str(x))
+    if True:
+        # how to only set once
+        if call("(echo 'export GOROOT=/root/go' >> ~/.profile)", shell=True) == 0:
+            if call("(echo 'export GOPATH=/root/work' >> ~/.profile)", shell=True) == 0:
+                if call("(echo 'export PATH=$PATH:$GOROOT/bin:$GOPATH/bin' >> ~/.profile)", shell=True) == 0:
+                    msg.append('Set PATH variable')
+                    return (True, msg)
+            msg.append('Could not set PATH variable')
+            return (False, msg)
+        else:
             return (True, msg)
-        msg.extend(['Retry'])
-    return(False, msg)
-        
+        msg.append('Installing go failed')
+        return (False, msg)
+    else:
+        msg.append('Go already installed')
+        return (True, msg)
+
+def install_canid():
+    link = 'https://github.com/britram/canid.git'
+    if call(['mkdir', '-p', '/root/work/src/github.com/britram/']) == 0:
+        if not os.path.isdir('/root/work/src/github.com/britram/canid/'):
+            if call(['git', 'clone', link, '/root/work/src/github.com/britram/canid/']) != 0:
+                return(False, 'Could not download canid')
+        if call(['/root/go/bin/go', 'install', 'github.com/britram/canid/canid'], env={'GOPATH': '/root/work/'}) == 0:
+            return (True, 'Installed canid')
+    return (False, 'Installing canid failed')
+
+def install_hellfire():
+    path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/go/bin:/root/work/bin'
+    if call(['/root/go/bin/go', 'get', 'pathspider.net/hellfire/...'], env={'GOPATH': '/root/work/', 'GOROOT':'/root/go/', 'PATH':path}) == 0:
+        return (True, 'Installed Hellfire')
+    return (False, 'Installing Hellfire failed')
+
+def setup_hellfire():
+    debug = config['task']['debug']
+    name = config['slack']['name']
+
+    go_link = 'https://dl.google.com/go/go1.11.linux-amd64.tar.gz'
+    go_tar_name = 'go.tar.gz'
+
+    success, msg = install_packets()
+    if success:
+        success, report = install_go(go_link, go_tar_name)
+        msg.append(report)
+        if success:
+            success, report = install_canid()
+            msg.append(report)
+            if success:
+                success, report = install_hellfire()
+                msg.append(report)
+                if success:
+                    #successfully installed, write to config
+                    initialize_slack(config['slack']['token'], config['slack']['channel'])
+                    if not debug:
+                        msg = []
+                    post(name, ['Setup successful'] + msg)
+                    sys.exit([0])
+    # Installation failed, write in config
+    try:
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
+        if not debug:
+            msg = []
+        post(name, ['Setup failed'] + msg)
+    except:
+        # Slack not installed
+        pass
+    sys.exit([1])
+
+##################################################################
+# REPORTING FUNCTIONS
+##################################################################
+
+def initialize_slack(token, channel):
+    global slackClient
+    global s_channel
+    if slackClient == None:
+        try:
+            from slacker import Slacker
+            
+            slackClient = Slacker(token)
+            
+            s_channel = channel
+            return True
+        except:
+            print('Could not start Slack Client')
+            return False
+    else:
+        return True
+
+def post(tag, lines):
+    tag += ':\n'
+    for line in lines:
+        tag += '    ' + str(line) + '\n'
+    slackClient.chat.post_message(s_channel, tag)
+
 def process_stderr(filename):
     error = []
     file = open(filename, 'r')
     for line in file: 
         error.append(line)
     return error
-
-def destroy_VM(headers, id):
-    try:
-        import requests
-        url = "https://api.digitalocean.com/v2/droplets/" + str(id)
-        # delete droplet
-        requests.delete(url, headers=headers)
-    except:
-        #what if request not installed?
-        pass
 
 def analyze_output(filename, plugin):
     if plugin in ['dscp', 'ecn', 'evilbit', 'h2', 'udpzero']:
@@ -150,6 +296,17 @@ def search(filename, keywords):
                     break
     return json.dumps(counter)
 
+##################################################################
+# TASK FUNCTIONS
+##################################################################
+
+def measure(input, output, workers, plugin, stderr):
+    if call(['pspdr', 'measure', '-i', 'eth0', '--input', input, '--output', output, '-w', workers, plugin], stderr=open(stderr, 'w')) != 0:
+        # Failed measurement
+        return (False, process_stderr(stderr))
+    else:
+        return (True, [])
+
 def upload(output, plugin, location, token, campaign, stderr): 
     # Set variables
     metadata1 = 'plugin:' + plugin
@@ -160,15 +317,22 @@ def upload(output, plugin, location, token, campaign, stderr):
         return (False, process_stderr(stderr))
     # Upload successful
     else:
-        return (True, [])  
+        return (True, []) 
 
-def measure(input, output, workers, plugin, stderr):
-    if call(['pspdr', 'measure', '-i', 'eth0', '--input', input, '--output', output, '-w', workers, plugin], stderr=open(stderr, 'w')) != 0:
-        # Failed measurement
-        return (False, process_stderr(stderr))
-    else:
-        return (True, [])
-           
+def destroy_VM(headers, id):
+    try:
+        import requests
+        url = "https://api.digitalocean.com/v2/droplets/" + str(id)
+        # delete droplet
+        requests.delete(url, headers=headers)
+    except:
+        #what if request not installed?
+        pass
+
+##################################################################
+# HELPER FUNCTIONS
+##################################################################
+          
 def name_files(inputs, outputs, location, plugin):
     '''
     returns a list of tuple with tuple = (input, output, stderr) (names)
@@ -185,62 +349,12 @@ def name_files(inputs, outputs, location, plugin):
         in_out = [(inputs[i], location + '-' + outputs[i]) for i in range(len(inputs))]
     return [(input, output, output +  '_stderr') for input, output in in_out]
 
-def initialize_slack(token, channel):
-    global slackClient
-    global s_channel
-    if slackClient == None:
-        try:
-            from slacker import Slacker
-            
-            slackClient = Slacker(token)
-            
-            s_channel = channel
-            return True
-        except:
-            print('Could not start Slack Client')
-            return False
-    else:
-        return True
-
-def post(tag, lines):
-    tag += ':\n'
-    for line in lines:
-        tag += '    ' + line + '\n'
-    slackClient.chat.post_message(s_channel, tag)
-
 def write_conf(config):
     json.dump(config, open('config.json', 'w'), indent=4)
 
-def install_all():
-    global config
-    debug = config['task']['debug']
-    name = config['slack']['name']
-
-    success, report = setup()
-    if success:
-        #successfully installed, write to config
-        config['install']['install complete'] = True
-        write_conf(config)
-        initialize_slack(config['slack']['token'], config['slack']['channel'])
-        if not debug:
-            report = []
-        if config['task']['measure']:
-            report.append('Starting measurements')
-        post(name, ['Setup successful'] + report)
-        sys.exit([0])
-    else:
-        # Installation failed, write in config
-        config['install']['install complete'] = False
-        write_conf(config)
-        try:
-            initialize_slack(config['slack']['token'], config['slack']['channel'])
-            if not debug:
-                report = []
-            post(name, ['Setup failed'] + report)
-        except:
-            # Slack not installed
-            pass
-        sys.exit([1])
+##################################################################
+# MAIN
+##################################################################
 
 if __name__ == "__main__":
     debug = config['task']['debug']

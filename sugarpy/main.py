@@ -13,15 +13,20 @@ def initialize_client(hosts, key):
     enable_logger(logger)
     return ParallelSSHClient(hosts, user = 'root', pkey = key)
 
-def send_ssh(client, jobs_setup):
-    if type(jobs_setup) == list:
+def send_ssh(client, jobs_setup, config):
+    if config['task']['install'] or config['task']['hellfire']:
         print('Setting up configs')
         # => install mode
         output = client.run_command('%s', host_args = jobs_setup)
         client.join(output, consume_output=False, timeout=None)
-        print('Installing programs')
-        output = client.run_command("python3 -c 'from remote_script import *; install_all()'")
-        client.join(output, consume_output=False, timeout=None)
+        if config['task']['install']:
+            print('Installing programs')
+            output = client.run_command("python3 -c 'from remote_script import *; install_all()'")
+            client.join(output, consume_output=False, timeout=None)
+        else:
+            print('Installing hellfire')
+            output = client.run_command("python3 -c 'from remote_script import *; setup_hellfire()' >>log.txt 2>&1")
+            client.join(output, consume_output=False, timeout=None)
     else:
         print('Updating configs')
         output = client.run_command(jobs_setup)
@@ -48,15 +53,21 @@ def copy_files(client, configfile, inputfiles):
             joinall(cmds, raise_error=True)
     sleeping(10)
 
-def get_info_from_config(config):
+def get_info_from_config(config, place):
     try:
-        host_info = config['setup']['host info']
+        if place == 'setup':
+            host_info = config['setup']['host info']
+        elif place == 'hellfire':
+            host_info = config['hellfire']['host info']
+        else:
+            print('Neither hellfire nor setup selected')
+            return False
     except:
         print('No host info found. Create Droplets first')
         return False
     try:
         hosts = [ip for name, ip, id in host_info]
-        if config['task']['install']:
+        if config['task']['install'] or config['task']['hellfire']:
             copy = True
             jobs_setup = ['python3 update_config.py ' + 'name=' + name + ' id=' + str(id) for name, ip, id in host_info]
             # print(jobs_setup)
@@ -143,11 +154,38 @@ def main(configfile):
     config = json.load(open(configfile))
     overwrite = True
 
+    if config['task']['hellfire']:
+        if 'hellfire' not in config: config['hellfire'] = {}
+        # check if host info exists
+        elif 'host info' in config['hellfire']:
+            answer = input('Do you want to override the current hellfire host information?\ny or yes to continue:')
+            if answer not in ['y', 'yes']: overwrite = False
+        
+        if overwrite:
+            config['hellfire']['host info'] = setup_droplets(config, 'hellfire')
+            json.dump(config, open(configfile, 'w'), indent=4)   
+            print ('Created hellfire server.')
+            sleeping(50)
+        else:
+            host_info =  config['hellfire']['host info']
+        
+        # extract ip addresses
+        hosts, jobs_setup, copy = get_info_from_config(config, 'hellfire')
+        client = initialize_client(hosts, config['setup']['ssh key'])
+        # copy files - dont copy inputfiles. you create them now
+        copy_files(client, configfile, [])
+        # update config and install go, canid and hellfire
+        send_ssh(client, jobs_setup, config)
+        # start hellfire remotly
+        print('Starting Hellfire')
+        client.run_command('setsid hellfire -h', use_pty = False)
+        # exit program: Hellfire should not run (opt: is_ready function too check if hellfire completex. then get input files)
+        sys.exit([0])
+
     if config['task']['create']:
         if 'host info' in config['setup']:
             answer = input('Do you want to override the current host information?\ny or yes to continue:')
-            if answer not in ['y', 'yes']:
-                overwrite = False
+            if answer not in ['y', 'yes']: overwrite = False
 
     if overwrite:
         if config['task']['create']:
@@ -156,14 +194,13 @@ def main(configfile):
             config['setup']['host info'] = host_info
             json.dump(config, open(configfile, 'w'), indent=4)   
             print ('Created droplets.')
-            if config['task']['install']:
-                sleeping(50)
+            if config['task']['install']: sleeping(50)
         
         if config['task']['install'] or config['task']['measure'] or config['task']['upload'] or config['task']['destroy']:
-            hosts, jobs_setup, copy = get_info_from_config(config)
+            hosts, jobs_setup, copy = get_info_from_config(config, 'setup')
             client = initialize_client(hosts, config['setup']['ssh key'])
             if copy: copy_files(client, configfile, config['measure']['inputfile'])
-            send_ssh(client, jobs_setup)
+            send_ssh(client, jobs_setup, config)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
 
 def comand_line_parser():
