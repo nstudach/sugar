@@ -148,15 +148,17 @@ def download_inputs():
 # HELLFIRE FUNCTIONS
 ##################################################################
 
-def install_go(link, name):
+def install_go():
     msg = []
-    try:
-        if not os.path.isfile(name):
-            import requests
-            r = requests.get(link)
-            open(name, 'wb').write(r.content)
-            msg.append('Downloaded %s as file %s' % (link, name))
-    except:
+    link = 'https://dl.google.com/go/go1.11.linux-amd64.tar.gz'
+    name = 'go.tar.gz'
+
+    if not os.path.isfile(name):
+        import requests
+        r = requests.get(link)
+        open(name, 'wb').write(r.content)
+        msg.append('Downloaded %s as file %s' % (link, name))
+    else:
         return (False, 'Could not download go tar.gz')
 
     if not os.path.isdir('/root/go'):
@@ -165,61 +167,41 @@ def install_go(link, name):
         else:
             msg.append('Go extraction failed')
     else:
-        msg.append('Tar already extracted')
-    
-
-    x =  call(['/root/go/bin/go', 'version'])
-    msg.append('Return code is ' + str(x))
-    if True:
-        # how to only set once
-        if call("(echo 'export GOROOT=/root/go' >> ~/.profile)", shell=True) == 0:
-            if call("(echo 'export GOPATH=/root/work' >> ~/.profile)", shell=True) == 0:
-                if call("(echo 'export PATH=$PATH:$GOROOT/bin:$GOPATH/bin' >> ~/.profile)", shell=True) == 0:
-                    msg.append('Set PATH variable')
-                    return (True, msg)
-            msg.append('Could not set PATH variable')
-            return (False, msg)
-        else:
-            return (True, msg)
-        msg.append('Installing go failed')
-        return (False, msg)
-    else:
         msg.append('Go already installed')
-        return (True, msg)
 
 def install_canid():
-    link = 'https://github.com/britram/canid.git'
+    # download canid
     if call(['mkdir', '-p', '/root/work/src/github.com/britram/']) == 0:
+        link = 'https://github.com/britram/canid.git'
         if not os.path.isdir('/root/work/src/github.com/britram/canid/'):
             if call(['git', 'clone', link, '/root/work/src/github.com/britram/canid/']) != 0:
-                return(False, 'Could not download canid')
-        if call(['/root/go/bin/go', 'install', 'github.com/britram/canid/canid'], env={'GOPATH': '/root/work/'}) == 0:
-            return (True, 'Installed canid')
-    return (False, 'Installing canid failed')
+                return (False, ['Could not download canid'])
+    # install canid
+    if call(['/root/go/bin/go', 'install', 'github.com/britram/canid/canid'], env={'GOPATH': '/root/work/'}) == 0:
+        return (True, ['Installed canid'])
+    else:
+        return (False, ['Installing canid failed'])
 
 def install_hellfire():
     path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/go/bin:/root/work/bin'
     if call(['/root/go/bin/go', 'get', 'pathspider.net/hellfire/...'], env={'GOPATH': '/root/work/', 'GOROOT':'/root/go/', 'PATH':path}) == 0:
-        return (True, 'Installed Hellfire')
-    return (False, 'Installing Hellfire failed')
+        return (True, ['Installed Hellfire'])
+    return (False, ['Installing Hellfire failed'])
 
 def setup_hellfire():
     debug = config['task']['debug']
     name = config['slack']['name']
 
-    go_link = 'https://dl.google.com/go/go1.11.linux-amd64.tar.gz'
-    go_tar_name = 'go.tar.gz'
-
     success, msg = install_packets()
     if success:
-        success, report = install_go(go_link, go_tar_name)
-        msg.append(report)
+        success, report = install_go()
+        msg += report
         if success:
             success, report = install_canid()
-            msg.append(report)
+            msg += report
             if success:
                 success, report = install_hellfire()
-                msg.append(report)
+                msg += report
                 if success:
                     #successfully installed, write to config
                     initialize_slack(config['slack']['token'], config['slack']['channel'])
@@ -227,7 +209,7 @@ def setup_hellfire():
                         msg = []
                     post(name, ['Setup successful'] + msg)
                     sys.exit([0])
-    # Installation failed, write in config
+    # Installation of packets failed
     try:
         initialize_slack(config['slack']['token'], config['slack']['channel'])
         if not debug:
