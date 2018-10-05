@@ -159,16 +159,20 @@ def install_go():
         open(name, 'wb').write(r.content)
         msg.append('Downloaded %s as file %s' % (link, name))
     else:
-        return (False, 'Could not download go tar.gz')
+        msg.append(name + ' already downloaded')
 
     if not os.path.isdir('/root/go'):
         if call(['tar', 'xvf', name]) == 0:
             msg.append('Extracted ' + name)
+            return (True, msg)
         else:
             msg.append('Go extraction failed')
+            return (False, msg)
     else:
         msg.append('Go already installed')
-
+        return (True, msg)
+    return (False, ['Code should not get here'])
+    
 def install_canid():
     # download canid
     if call(['mkdir', '-p', '/root/work/src/github.com/britram/']) == 0:
