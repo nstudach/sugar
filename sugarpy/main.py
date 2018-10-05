@@ -5,6 +5,7 @@ import os
 import argparse
 
 import requests
+from subprocess import call
 from pssh.clients import ParallelSSHClient
 from pssh.utils import enable_logger, logger
 from gevent import joinall
@@ -36,22 +37,24 @@ def send_ssh(client, jobs_setup, config):
     client.run_command('setsid python3 remote_script.py', use_pty = False)
     sleeping(20)
 
-def copy_files(client, configfile, inputfiles):
+def copy_files(hosts, key, configfile, inputfiles):
     # get install directory where scripts are located
-    install_dir = open('/opt/sugar/installation-path.txt', 'r').readline()
+    i_dir = open('/opt/sugar/installation-path.txt', 'r').readline()
     print('Start copying files')
-    # copy remote_script, input files, config file
-    cmds = client.copy_file(install_dir + 'remote_script.py', 'remote_script.py')
-    joinall(cmds, raise_error=True)
-    cmds = client.copy_file(install_dir + 'update_config.py', 'update_config.py')
-    joinall(cmds, raise_error=True)
-    cmds = client.copy_file(configfile, 'config.json')
-    joinall(cmds, raise_error=True)
+    files = [(i_dir + 'remote_script.py', 'remote_script.py'),
+             (i_dir + 'update_config.py', 'update_config.py'),
+             (configfile, 'config.json')]
+    # add inputfiles to list if required
     for inputfile in inputfiles:
         if not inputfile.startswith('http'):
-            cmds = client.copy_file(inputfile, os.path.basename(inputfile))
-            joinall(cmds, raise_error=True)
-    sleeping(10)
+            files.append((inputfile,os.path.basename(inputfile)))
+    # copy remote_script, input files, config file
+    for ip in hosts:
+        print('Host: %s' % ip)
+        host = 'root@' + str(ip) + ':'
+        for source, target in files:
+            if call(['scp', '-i', key, '-o', 'StrictHostKeyChecking=no', source, host + target]) == 0:
+                print('Copied %s' % source)
 
 def get_info_from_config(config, place):
     try:
@@ -171,7 +174,7 @@ def main(configfile):
         if config['task']['install'] or config['task']['measure'] or config['task']['upload'] or config['task']['destroy']:
             hosts, jobs_setup, copy = get_info_from_config(config, 'setup')
             client = initialize_client(hosts, config['setup']['ssh key'])
-            if copy: copy_files(client, configfile, config['measure']['inputfile'])
+            if copy: copy_files(hosts, config['setup']['ssh key'], configfile, config['measure']['inputfile'])
             send_ssh(client, jobs_setup, config)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
 
@@ -197,7 +200,7 @@ def hellfire_setup(configfile):
     hosts, jobs_setup, _ = get_info_from_config(config, 'hellfire')
     client = initialize_client(hosts, config['setup']['ssh key'])
     # copy files - dont copy inputfiles
-    copy_files(client, configfile, [])
+    copy_files(hosts, config['setup']['ssh key'], configfile, [])
     # update config and install programms, run hellfire
     send_ssh(client, jobs_setup, config)
 
