@@ -154,34 +154,6 @@ def main(configfile):
     config = json.load(open(configfile))
     overwrite = True
 
-    if config['task']['hellfire']:
-        if 'hellfire' not in config: config['hellfire'] = {}
-        # check if host info exists
-        elif 'host info' in config['hellfire']:
-            answer = input('Do you want to override the current hellfire host information?\ny or yes to continue:')
-            if answer not in ['y', 'yes']: overwrite = False
-        
-        if overwrite:
-            config['hellfire']['host info'] = setup_droplets(config, 'hellfire')
-            json.dump(config, open(configfile, 'w'), indent=4)   
-            print ('Created hellfire server.')
-            sleeping(50)
-        else:
-            host_info =  config['hellfire']['host info']
-        
-        # extract ip addresses
-        hosts, jobs_setup, copy = get_info_from_config(config, 'hellfire')
-        client = initialize_client(hosts, config['setup']['ssh key'])
-        # copy files - dont copy inputfiles. you create them now
-        copy_files(client, configfile, [])
-        # update config and install go, canid and hellfire
-        send_ssh(client, jobs_setup, config)
-        # start hellfire remotly
-        print('Starting Hellfire')
-        client.run_command('setsid hellfire -h', use_pty = False)
-        # exit program: Hellfire should not run (opt: is_ready function too check if hellfire completex. then get input files)
-        sys.exit([0])
-
     if config['task']['create']:
         if 'host info' in config['setup']:
             answer = input('Do you want to override the current host information?\ny or yes to continue:')
@@ -203,12 +175,38 @@ def main(configfile):
             send_ssh(client, jobs_setup, config)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
 
+def hellfire_setup(configfile):
+    config = json.load(open(configfile))
+    overwrite = True
+
+    if 'hellfire' not in config: config['hellfire'] = {}
+    # check if host info exists
+    elif 'host info' in config['hellfire']:
+        answer = input('Do you want to override the current hellfire host information?\ny or yes to continue:')
+        if answer not in ['y', 'yes']: overwrite = False
+    
+    if overwrite:
+        # set region to only 1
+        config['provider']['regions'] = [config['provider']['regions'][0]]
+        config['hellfire']['host info'] = setup_droplets(config, 'hellfire')
+        json.dump(config, open(configfile, 'w'), indent=4)   
+        print ('Created hellfire server.')
+        sleeping(50)
+
+    # extract ip addresses
+    hosts, jobs_setup, _ = get_info_from_config(config, 'hellfire')
+    client = initialize_client(hosts, config['setup']['ssh key'])
+    # copy files - dont copy inputfiles
+    copy_files(client, configfile, [])
+    # update config and install programms, run hellfire
+    send_ssh(client, jobs_setup, config)
+
+
 def comand_line_parser():
     parser = argparse.ArgumentParser(description = 'Manage automated pathspider measurements')
     parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin')
     parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location', default = 'configs/config.json')
     parser.add_argument('--key', help = 'Path to ssh authentication key', metavar = 'file-location')   
-    parser.set_defaults(func = main)
     args=parser.parse_args()
 
     # add key and plugin to config NOT WORKING
@@ -221,4 +219,7 @@ def comand_line_parser():
         config['measure']['plugin'] = 'droplet'
     json.dump(config, open(args.config, 'w'), indent=4)
 
-    args.func(args.config)
+    if config['task']['hellfire']:
+        hellfire_setup(args.config)
+    else:
+        main(args.config)
