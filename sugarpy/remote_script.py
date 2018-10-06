@@ -298,7 +298,7 @@ def upload(output, plugin, location, token, campaign, stderr):
     metadata1 = 'plugin:' + plugin
     metadata2 = 'location:' + location
     # Upload data
-    if call(['pspdr', 'upload', '--metadata', metadata1, metadata2, '--token', token, '--campaign', campaign, output], stderr=open(stderr, 'w')) != 0:
+    if call(['pspdr', 'upload', '--add', metadata1, metadata2, '--token', token, '--campaign', campaign, output], stderr=open(stderr, 'w')) != 0:
         # Upload failed
         return (False, process_stderr(stderr))
     # Upload successful
