@@ -63,5 +63,8 @@
         "measure": true,
         "upload": false,
         "destroy": false
+    },
+    "setup": {
+        "ssh key": "keys/id_rsa"
     }
 }
