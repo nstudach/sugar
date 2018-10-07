@@ -16,14 +16,20 @@ You can install sugar by:
 ## 2. Usage
 
 Sugar can be run in the terminal with `sugar -h`
-Currently it is required to run sugar from within the sugar folder.
-The reason is that sugar will copy files to the remote servers and the location is hard coded.
+Sugar will add a folder /opt/sugar/ for application data
 
 The possible arguments are:
 
-* **--config** Expects the path to the config file (See 3. about configuring the file)
-* **--plugin** The pathspider plugin you want to use (See: pathspider.com)
-* **--key** The location of the SSH keypair (See 4.)
+* **--config** Expects the path to the config file (See 3. about configuring the file).
+  * Example: --config configs/config.json
+* **--plugin** The pathspider plugin you want to use (See: pathspider.com).
+  * Example: --plugin ecn
+* **--key** The location of the SSH keypair (See "droplet" and "setup").
+  * Example: --key /home/user/.ssh/rsa_id
+* **--fetch** Downloads input from the hellfire VM, executes --split.
+  * Example: topsites.ndjson 200000
+* **--split** filename n    Splits input into n sized parts, adds them to config file.
+  * Example: topsites.ndjson 200000
 
 You can run multiple plugin measurements simultaniously as long as your Digital Ocean account supports the large amount of droplets.
 
@@ -39,6 +45,11 @@ The config consists of 4 parts:
 * **"token"**: Your slack channel bot token
 * **"channel"**: channel to post in
 
+### "provider" for Digital Ocean parameters
+
+* **"headers"**:Your digital ocean token should replace `<<DO API Token>>`
+* **"regions"**: Regions to deploy a VM in. Choose from ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", "sfo2", "sgp1", "tor1"]
+
 ### "droplet" - Configures your droplet
 
 * **"name" & "region"** will be filled out automatically
@@ -46,20 +57,25 @@ The config consists of 4 parts:
 * **"image**: OS slug. Use at least "debian-9-x64" for python 3.5 support.
 * **"ssh_keys"**: SSH key id number (deployed on your Digital Ocean account)
 
-### "provider" for Digital Ocean parameters
+### "install" for task install
 
-* **"headers"**:Your digital ocean token should replace `<<DO API Token>>`
-* **"regions"**: Regions to deploy a VM in. Choose from ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc3", "sfo2", "sgp1", "tor1"]
+* **"packages"**: List of packages to install with apt-get
+* **"py_packages":**: List of packages to install with pip
 
-### "measurement" for measurement parameters
+### "measure" for task measure
 
 * **"inputfile"**: List of strings representing either a filename or a link to a downloadable file
-* **"outputfile"**: You can name your outputfiles here. List must be same lenght as inputfile or it will be ignored. Wont work with upload and multiple VM's due to identical names
+* **"outputfile"**: You can name your outputfiles here. List must be same lenght as inputfile or it will be ignored.
 * **"campaign"**: Your PTO campaign name as string
 * **"token"**: Your PTO access token as string
 * **"workers"**: number of workers
 
-### "setup" Defines task to execute
+### "upload" for task upload
+
+* **"campaign"**: Your PTO campaign name as string
+* **"token"**: Your PTO access token as string
+
+### "task" Defines task to execute
 
 * **"debug"**: (_true_/_false_): activate debug mode. More information posted to slack channel
 * **"hellfire"**: (_true_/_false_): Downloads new input file via hellfire
@@ -68,8 +84,12 @@ The config consists of 4 parts:
 * **"measure""**: (_true_/_false_): Enables Measurement
 * **"upload"**: (_true_/_false_): Enables upload
 * **"destroy"**: (_true_/_false_): Destroys droplets after completion of all tasks
-* **"host info"**: Stores current host information after Creation (leave empty if no droplets exist yet)
 
-## 4. SSH Key
+### "setup" stores setup data
 
-The SSH Private key must be placed in the folder keys with the names `id_rsa` and `id_rsa.pub`
+* **"host info"**: Stores current host information after creation (leave empty if no droplets exist yet). Enables connection to existing droplets.
+* **"SSH Key"**: The locaction of your SSH private key. Can also be set using --key option.
+
+### "hellfire" stores hellfire setup data
+
+* **"host info"**: Stores current host information after creation (leave empty if no droplets exist yet). Enables connection to existing droplets.
