@@ -1,10 +1,13 @@
 import time
 import os
+import re
 import sys
+import bz2
 import json
 import string
 import random
 from subprocess import call
+from subprocess import Popen
 from collections import defaultdict
 
 # global config avoids refreshes
@@ -98,7 +101,7 @@ def install_git():
     failed_pkg = ''
     if not os.path.isdir('pathspider'):
         ps_link = 'https://github.com/nstudach/pathspider.git'
-        if call(['git', 'clone', '-b', 'uploader', '--single-branch', ps_link]) != 0:
+        if call(['git', 'clone', '-b', 'uploader_v2', '--single-branch', ps_link]) != 0:
             failed_pkg += 'Download pathspider, '
     
     if not os.path.isdir('python-libtrace'):
@@ -131,7 +134,12 @@ def download_inputs():
             try:
                 msg.append('Downloaded inputfile from: ' + str(file))
                 r = requests.get(file)
-                new_name = ''.join(['input', str(i), '.ndjson'])
+                # extract name
+                new_name = re.findall('="(.+)"', r.headers['content-disposition'])
+                if new_name == []:
+                    new_name = ''.join(['input', str(i), '.ndjson'])
+                else:
+                    new_name = new_name[0]
                 with open(new_name, 'wb') as f:
                     f.write(r.content)
                 config['measure']['inputfile'][i-1] = new_name
@@ -139,8 +147,9 @@ def download_inputs():
                 msg.append('Could not download ' + str(file))
                 return (False, msg)
         else:
-            # remove path before filename
-            config['measure']['inputfile'][i-1] = os.path.basename(file)
+            # remove path before filename and add .bz2
+            config['measure']['inputfile'][i-1] = os.path.basename(file) + '.bz2'
+        config['measure']['inputfile'][i-1] = decompress_file(config['measure']['inputfile'][i-1])
     write_conf(config)  
     return (True, msg)
 
@@ -318,7 +327,33 @@ def destroy_VM(headers, id):
 ##################################################################
 # HELPER FUNCTIONS
 ##################################################################
-          
+
+def compress_file(filename):
+    if filename.endswith(".bz2"):
+        return filename
+    else:
+        new_filename = filename + ".bz2"
+        compressionLevel = 9
+        with open(filename, 'rb') as data:
+            fh = open(new_filename, "wb")
+            fh.write(bz2.compress(data.read(), compressionLevel))
+            fh.close()
+        return new_filename
+
+def decompress_file(filename):
+    '''
+    decompresses file from bz2 if possible
+    '''
+    if not filename.endswith(".bz2"):
+        return filename
+    else:
+        new_filename = os.path.splitext(filename)[0]
+        with open(filename, 'rb') as data:
+            fh = open(new_filename, "wb")
+            fh.write(bz2.decompress(data.read()))
+            fh.close()
+        return new_filename
+
 def name_files(inputs, outputs, location, plugin):
     '''
     returns a list of tuple with tuple = (input, output, stderr) (names)
@@ -327,7 +362,7 @@ def name_files(inputs, outputs, location, plugin):
     if len(inputs) != len(outputs):
         global config
         pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
-        in_out = [(inputs[i], pre_output + '-' + str(i)) for i in range(len(inputs))]
+        in_out = [(inputs[i], pre_output + '-' + str(i) + '.ndjson') for i in range(len(inputs))]
         # write new outputs in config
         config['measure']['outputfile'] = [y for x,y in in_out]
         write_conf(config)    
@@ -344,49 +379,59 @@ def write_conf(config):
 
 if __name__ == "__main__":
     debug = config['task']['debug']
-    #def variables
     name = config['slack']['name']
-    location = config['upload']['location']
-    plugin = config['measure']['plugin']
 
-    if config['install']['install complete']:
+    # Run hellfire or pathspider, not both
+    if config['task']['hellfire']:
+        path = {'GOPATH': '/root/work/',
+                'GOROOT':'/root/go/',
+                'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/go/bin:/root/work/bin'
+                } 
+        # run canid
+        Popen(['setsid', 'canid', '-port', '8043'], env = path)
+        time.sleep(60)
+        # run hellfire, save as /root/topsites.ndjson
+        call('hellfire --topsites --canid localhost:8043 > topsites.ndjson 2> helf.txt', shell=True, env=path)
+        _ = compress_file('topsites.ndjson')
+        initialize_slack(config['slack']['token'], config['slack']['channel'])
+        post(name, ['Inputfile ready'])
+
+    elif config['install']['install complete']:
         initialize_slack(config['slack']['token'], config['slack']['channel'])
     
         if config['task']['measure'] or config['task']['upload']:
             option = config['measure']
-            all_filenames = name_files(option['inputfile'], option['outputfile'], location, plugin)
+            plugin = option['plugin']
+            location = config['upload']['location']
 
-    if config['task']['measure'] and config['install']['install complete']:
-        # prepare measurement
-        for filenames in all_filenames:
-            input, output, stderr = filenames
-            tag = name +' with ' + input
-            if debug:
-                temp = ' '.join(['Started measurement: pspdr measure -i eth0 --input', input, '--output', output, '-w', option['workers'], plugin,'\n'])
-                post(tag, [temp])
-            #run measurement
-            success, report = measure(input, output, option['workers'], plugin, stderr)
-            if success:
-                # Analyse output
-                report.extend(analyze_output(output, plugin))
-                post(tag, ['Measurement successful:'] + report)
-            else:
-                if not debug:
-                    report = []
-                post(tag, ['Measurement failed:'] + report)
+            for filenames in name_files(option['inputfile'], option['outputfile'], location, plugin):
+                input, output, stderr = filenames
+                tag = name +' with ' + input
+                
+                if config['task']['measure']:
+                    if debug:
+                        temp = ' '.join(['Started measurement: pspdr measure -i eth0 --input', input, '--output', output, '-w', option['workers'], plugin,'\n'])
+                        post(tag, [temp])
+                    #run measurement
+                    success, report = measure(input, output, option['workers'], plugin, stderr)
+                    if success:
+                        report.extend(analyze_output(output, plugin))
+                        post(tag, ['Measurement successful:'] + report)
+                    else:
+                        if not debug: report = []
+                        post(tag, ['Measurement failed:'] + report)
+                        continue
 
-    if config['task']['upload'] and config['install']['install complete']:
-        #upload file
-        for filenames in all_filenames:
-            input, output, stderr = filenames
-            tag = name +' with ' + filenames[0]
-            success, report = upload(output, plugin, location, option['token'], option['campaign'], stderr)
-            if success:
-                # Upload successful
-                post(tag, ['Upload successful:'] + report) 
-            else:
-                # Upload failed
-                post(tag, ['Upload failed:'] + report)  
+                if config['task']['upload']:
+                    option = config['upload']
+                    success, report = upload(output, plugin, location, option['token'], option['campaign'], stderr)
+                    if success:
+                        post(tag, ['Upload successful:'] + report) 
+                    else:
+                        post(tag, ['Upload failed:'] + report)
+    else:
+        # VM not set up properly
+        pass
 
     if config['task']['destroy']:
         initialize_slack(config['slack']['token'], config['slack']['channel'])

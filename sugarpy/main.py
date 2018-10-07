@@ -1,6 +1,7 @@
 import json
 import time
 import sys
+import bz2
 import os
 import argparse
 
@@ -14,20 +15,21 @@ def initialize_client(hosts, key):
     enable_logger(logger)
     return ParallelSSHClient(hosts, user = 'root', pkey = key)
 
-def send_ssh(client, jobs_setup, config):
-    if config['task']['install'] or config['task']['hellfire']:
+def send_ssh(client, jobs_setup, config, mode):
+    if mode == 'install':
         print('Setting up configs')
-        # => install mode
         output = client.run_command('%s', host_args = jobs_setup)
         client.join(output, consume_output=False, timeout=None)
-        if config['task']['install']:
-            print('Installing programs')
-            output = client.run_command("python3 -c 'from remote_script import *; install_all()'")
-            client.join(output, consume_output=False, timeout=None)
-        else:
-            print('Installing hellfire')
-            output = client.run_command("python3 -c 'from remote_script import *; setup_hellfire()' >>log.txt 2>&1")
-            client.join(output, consume_output=False, timeout=None)
+        print('Installing programs')
+        output = client.run_command("python3 -c 'from remote_script import *; install_all()'")
+        client.join(output, consume_output=False, timeout=None)
+    elif mode == 'hellfire':
+        print('Setting up configs')
+        output = client.run_command('%s', host_args = jobs_setup)
+        client.join(output, consume_output=False, timeout=None)
+        print('Installing hellfire')
+        output = client.run_command("python3 -c 'from remote_script import *; setup_hellfire()' >>log.txt 2>&1")
+        client.join(output, consume_output=False, timeout=None)
     else:
         print('Updating configs')
         output = client.run_command(jobs_setup)
@@ -47,6 +49,7 @@ def copy_files(hosts, key, configfile, inputfiles):
     # add inputfiles to list if required
     for inputfile in inputfiles:
         if not inputfile.startswith('http'):
+            inputfile = compress_file(inputfile)
             files.append((inputfile,os.path.basename(inputfile)))
     # copy remote_script, input files, config file
     for ip in hosts:
@@ -175,8 +178,10 @@ def main(configfile):
             hosts, jobs_setup, copy = get_info_from_config(config, 'setup')
             client = initialize_client(hosts, config['setup']['ssh key'])
             if copy: copy_files(hosts, config['setup']['ssh key'], configfile, config['measure']['inputfile'])
-            send_ssh(client, jobs_setup, config)
+            mode = 'install' if config['task']['install'] else ''
+            send_ssh(client, jobs_setup, config, mode)
             print('Disconnected from hosts! Progress will be displayed on the slack channel.')
+    return True
 
 def hellfire_setup(configfile):
     config = json.load(open(configfile))
@@ -202,17 +207,92 @@ def hellfire_setup(configfile):
     # copy files - dont copy inputfiles
     copy_files(hosts, config['setup']['ssh key'], configfile, [])
     # update config and install programms, run hellfire
-    send_ssh(client, jobs_setup, config)
+    send_ssh(client, jobs_setup, config, 'hellfire')
+    return True
 
+def get_inputfile(configfile, filename):
+    config = json.load(open(configfile))
+    host, _, _ = get_info_from_config(config, 'hellfire')
+    filename += '.bz2'
+    # retrieve input file from /root/topsites.ndjson
+    host = 'root@' + str(host[0]) + ':/root/topsites.ndjson.bz2'
+    call(['scp', '-i', config['setup']['ssh key'], '-o', 'StrictHostKeyChecking=no', host, filename])
+    print('Successfully downloaded, decompressing')
+    _ = decompress_file(filename)
+
+def clean(jf):
+    for tag in ["hellfire_lookup_attempts", "hellfire_lookup_type"]:
+        jf.pop(tag, None)
+    return json.dumps(jf) + '\n'
+
+def read_lines(filename):
+    with open(filename, 'r') as input:
+        for line in input.readlines():
+            try:
+                yield json.loads(line)
+            except:
+                print('line is not json format')
+                print(line)
+
+def split(configfile, filename, junk_size):
+    outfiles = []
+    i = junk_size
+    k = 0
+
+    for line in read_lines(filename):
+        if i == junk_size:
+            i = 0
+            k += 1
+            new_outfile = os.path.splitext(filename)[0] + '_' + str(k) + os.path.splitext(filename)[1]
+            outfiles.append(new_outfile)
+            outfile = open(new_outfile, 'a+') 
+        else:
+            i += 1
+            outfile.write(clean(line))
+
+    # write files in config
+    config = json.load(open(configfile))
+    config['measure']['inputfile'] = outfiles
+    json.dump(config, open(configfile, 'w'), indent=4)
+
+def compress_file(filename):
+    if filename.endswith(".bz2"):
+        return filename
+    else:
+        new_filename = filename + ".bz2"
+        compressionLevel = 9
+        with open(filename, 'rb') as data:
+            fh = open(new_filename, "wb")
+            fh.write(bz2.compress(data.read(), compressionLevel))
+            fh.close()
+        return new_filename
+
+def decompress_file(filename):
+    '''
+    decompresses file from bz2 if possible
+    '''
+    if not filename.endswith(".bz2"):
+        return filename
+    else:
+        new_filename = os.path.splitext(filename)[0]
+        with open(filename, 'rb') as data:
+            fh = open(new_filename, "wb")
+            fh.write(bz2.decompress(data.read()))
+            fh.close()
+        return new_filename
 
 def comand_line_parser():
     parser = argparse.ArgumentParser(description = 'Manage automated pathspider measurements')
     parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin')
-    parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location', default = 'configs/config.json')
+    parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location',
+                        default = 'configs/config.json')
     parser.add_argument('--key', help = 'Path to ssh authentication key', metavar = 'file-location')   
+    parser.add_argument('--fetch', nargs = 2, metavar = ('filename', 'n'),
+                        help = 'Downloads input, executes --split')
+    parser.add_argument('--split', nargs = 2, metavar = ('filename', 'n'),
+                        help = 'Splits input into n sized parts, adds them to config file')     
     args=parser.parse_args()
 
-    # add key and plugin to config NOT WORKING
     config = json.load(open(args.config))
     if args.key is not None:
         config['setup']['ssh key'] = args.key
@@ -222,7 +302,12 @@ def comand_line_parser():
         config['measure']['plugin'] = 'droplet'
     json.dump(config, open(args.config, 'w'), indent=4)
 
-    if config['task']['hellfire']:
+    if args.fetch is not None:
+        get_inputfile(args.config, args.fetch[0])
+        split(args.config, args.fetch[0], int(args.fetch[1]))
+    elif config['task']['hellfire']:
         hellfire_setup(args.config)
     else:
-        main(args.config)
+        if args.split is not None:
+            split(args.config, args.split[0], int(args.split[1]))
+        main(args.config) 
