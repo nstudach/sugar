@@ -361,14 +361,19 @@ def name_files(inputs, outputs, location, plugin):
     letters = string.ascii_letters + string.digits
     if len(inputs) != len(outputs):
         global config
-        pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
-        in_out = [(inputs[i], pre_output + '-' + str(i) + '.ndjson') for i in range(len(inputs))]
+        if len(outputs) == 1:
+            pre_output = outputs[0]
+        else:
+            pre_output = ''.join(random.sample(letters, k=5)) +'-' + location + '-' + plugin
+        in_out = [(inputs[i], pre_output + '-' + str(i+1) + '.ndjson') for i in range(len(inputs))]
         # write new outputs in config
         config['measure']['outputfile'] = [y for x,y in in_out]
         write_conf(config)    
     else:
-        in_out = [(inputs[i], location + '-' + outputs[i]) for i in range(len(inputs))]
-    return [(input, output, output +  '_stderr') for input, output in in_out]
+        # assume there is an input when task measure active, prevent renaming of prev named names
+        if location + '-' not in outputs[0]:
+            in_out = [(inputs[i], location + '-' + outputs[i]) for i in range(len(inputs))]
+    return [(input, output, 'stderr_' + output) for input, output in in_out]
 
 def write_conf(config):
     json.dump(config, open('config.json', 'w'), indent=4)
