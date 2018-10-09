@@ -202,6 +202,7 @@ def install_hellfire():
     return (False, ['Installing Hellfire failed'])
 
 def setup_hellfire():
+    return True
     debug = config['task']['debug']
     name = config['slack']['name']
 
@@ -393,13 +394,14 @@ if __name__ == "__main__":
                 'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/go/bin:/root/work/bin'
                 } 
         # run canid
-        Popen(['setsid', 'canid', '-port', '8043'], env = path)
-        time.sleep(60)
+        p = Popen(['canid', '-port', '8043'], env = path)
+        # time.sleep(60)
         # run hellfire, save as /root/topsites.ndjson
-        call('hellfire --topsites --canid localhost:8043 > topsites.ndjson 2> helf.txt', shell=True, env=path)
-        _ = compress_file('topsites.ndjson')
+        # call('hellfire --topsites --canid localhost:8043 > topsites.ndjson 2> helf.txt', shell=True, env=path)
+        # _ = compress_file('topsites.ndjson')
         initialize_slack(config['slack']['token'], config['slack']['channel'])
         post(name, ['Inputfile ready'])
+        #time.sleep(120)
 
     elif config['install']['install complete']:
         initialize_slack(config['slack']['token'], config['slack']['channel'])
