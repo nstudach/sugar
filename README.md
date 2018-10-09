@@ -62,6 +62,48 @@ The config consists of 4 parts:
 * **"packages"**: List of packages to install with apt-get
 * **"py_packages":**: List of packages to install with pip
 
+The following packages and py_packages are currently required for PATHspider:
+
+```
+    "packages": [
+        "libssl-dev",
+        "libtrace-dev",
+        "libldns-dev",
+        "libcurl4-openssl-dev",
+        "build-essential",
+        "python3-dev",
+        "tcpdump"
+    ],
+    "py_packages": [
+        "straight.plugin",
+        "pyroute2",
+        "scapy-python3",
+        "stem",
+        "dnslib",
+        "pycurl",
+        "nose",
+        "python-dateutil"
+    ]
+```
+
+The following packages and py_packages are currently required for Sugar:
+
+```
+    "packages": [
+        "git",
+        "build-essential",
+        "python3-dev",
+        "python3-pip"
+    ],
+    "py_packages": [
+        "slackClient",
+        "slacker",
+        "requests"
+    ]
+```
+
+No packages and py_packages are currently required for Hellfire but it runs over Sugar so those are still needed.
+
 ### "measure" for task measure
 
 * **"inputfile"**: List of strings representing either a filename or a link to a downloadable file
