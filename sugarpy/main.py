@@ -284,7 +284,7 @@ def decompress_file(filename):
 def comand_line_parser():
     parser = argparse.ArgumentParser(description = 'Manage automated pathspider measurements')
     parser.add_argument('--plugin', help = 'Pathspider plugin to use', metavar = 'plugin')
-    parser.add_argument('--config', help = 'Path to config file', metavar = 'file-location',
+    parser.add_argument('--config', help = 'Path to config file. Default is configs/config.json', metavar = 'file-location',
                         default = 'configs/config.json')
     parser.add_argument('--key', help = 'Path to ssh authentication key', metavar = 'file-location')   
     parser.add_argument('--fetch', nargs = 2, metavar = ('filename', 'n'),
