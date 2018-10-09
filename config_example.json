@@ -22,7 +22,7 @@
     },
     "measure":{
         "plugin": "ecn",
-        "inputfile": ["https://www.dropbox.com/s/qir9scob2och5wu/topsites.ndjson?dl=1", "other input files"],
+        "inputfile": ["https://link.com", "other input files"],
         "outputfile": [],
         "workers": "20"
     },
@@ -65,6 +65,6 @@
         "destroy": false
     },
     "setup": {
-        "ssh key": "keys/id_rsa"
+        "ssh key": "<<SSH Key Location>>"
     }
 }
