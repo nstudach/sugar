@@ -6,11 +6,13 @@ This program is written to automate internet path transparency measurements for 
 It creates virtual machines at different locations in the internet and sets them up to run pathspider on them.
 It can upload the measurements directly to the MAMI PTO and destroy each droplet after a succesfull or failed run.
 
+<https://github.com/nstudach/sugar>
+
 ## 1. Installation
 
 You can install sugar by:
 
-1. Cloning this git repository
+1. Cloning this [git repository](https://github.com/nstudach/sugar).
 1. In the folder sugar run `sudo python3 setup.py install`
 
 ## 2. Usage
@@ -64,7 +66,7 @@ The config consists of 4 parts:
 
 The following packages and py_packages are currently required for PATHspider:
 
-```
+```json
     "packages": [
         "libssl-dev",
         "libtrace-dev",
@@ -88,7 +90,7 @@ The following packages and py_packages are currently required for PATHspider:
 
 The following packages and py_packages are currently required for Sugar:
 
-```
+```json
     "packages": [
         "git",
         "build-essential",
